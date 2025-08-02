@@ -1,6 +1,8 @@
+import os
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
+from crewai.llm import LLM
 from typing import List
 from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
@@ -24,18 +26,24 @@ class Rscrew():
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
     def researcher(self) -> Agent:
+        llm = LLM(model="claude-3-5-sonnet-20241022", api_key=os.getenv("ANTHROPIC_API_KEY"))
+        print(f"Researcher LLM: {llm.model}")
         return Agent(
             config=self.agents_config['researcher'], # type: ignore[index]
             tools=[ReadFile(), ListDirectory(), FindFiles(), GetFileInfo()],
-            verbose=True
+            verbose=True,
+            llm=llm
         )
 
     @agent
     def reporting_analyst(self) -> Agent:
+        llm = LLM(model="claude-3-5-sonnet-20241022", api_key=os.getenv("ANTHROPIC_API_KEY"))
+        print(f"Reporting Analyst LLM: {llm.model}")
         return Agent(
             config=self.agents_config['reporting_analyst'], # type: ignore[index]
             tools=[ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo()],
-            verbose=True
+            verbose=True,
+            llm=llm
         )
 
     # To learn more about structured task outputs,
@@ -45,12 +53,14 @@ class Rscrew():
     def research_task(self) -> Task:
         return Task(
             config=self.tasks_config['research_task'], # type: ignore[index]
+            agent=self.researcher()
         )
 
     @task
     def reporting_task(self) -> Task:
         return Task(
             config=self.tasks_config['reporting_task'], # type: ignore[index]
+            agent=self.reporting_analyst(),
             output_file='report.md'
         )
 
