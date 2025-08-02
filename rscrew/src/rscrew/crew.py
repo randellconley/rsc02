@@ -280,6 +280,127 @@ class Rscrew():
         debug_print("========================================")
         return agent
 
+    # Specialized Planning Agents for Flag-Based System
+    @agent
+    def security_architecture_specialist(self) -> Agent:
+        debug_print("=== Creating Security Architecture Specialist Agent ===")
+        llm = create_llm_with_monitoring("Security Architecture Specialist")
+        
+        agent = Agent(
+            config=self.agents_config['security_architecture_specialist'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ArchitectureTools.design_system_architecture,
+                ArchitectureTools.create_api_specification
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Security Architecture Specialist created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("========================================================")
+        return agent
+
+    @agent
+    def database_architecture_specialist(self) -> Agent:
+        debug_print("=== Creating Database Architecture Specialist Agent ===")
+        llm = create_llm_with_monitoring("Database Architecture Specialist")
+        
+        agent = Agent(
+            config=self.agents_config['database_architecture_specialist'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ArchitectureTools.design_system_architecture,
+                TechnicalResearchTools.research_technology_stack
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Database Architecture Specialist created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("========================================================")
+        return agent
+
+    @agent
+    def frontend_architecture_specialist(self) -> Agent:
+        debug_print("=== Creating Frontend Architecture Specialist Agent ===")
+        llm = create_llm_with_monitoring("Frontend Architecture Specialist")
+        
+        agent = Agent(
+            config=self.agents_config['frontend_architecture_specialist'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ArchitectureTools.design_system_architecture,
+                DevelopmentTools.create_code_template
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Frontend Architecture Specialist created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("=======================================================")
+        return agent
+
+    @agent
+    def infrastructure_specialist(self) -> Agent:
+        debug_print("=== Creating Infrastructure Specialist Agent ===")
+        llm = create_llm_with_monitoring("Infrastructure Specialist")
+        
+        agent = Agent(
+            config=self.agents_config['infrastructure_specialist'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ArchitectureTools.design_system_architecture,
+                DevelopmentTools.generate_project_structure
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Infrastructure Specialist created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("=================================================")
+        return agent
+
+    @agent
+    def feature_analyst(self) -> Agent:
+        debug_print("=== Creating Feature Analyst Agent ===")
+        llm = create_llm_with_monitoring("Feature Analyst")
+        
+        agent = Agent(
+            config=self.agents_config['feature_analyst'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ProjectManagementTools.analyze_project_scope,
+                TechnicalResearchTools.research_technology_stack
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Feature Analyst created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("=======================================")
+        return agent
+
+    @agent
+    def plan_update_coordinator(self) -> Agent:
+        debug_print("=== Creating Plan Update Coordinator Agent ===")
+        llm = create_llm_with_monitoring("Plan Update Coordinator")
+        
+        agent = Agent(
+            config=self.agents_config['plan_update_coordinator'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ProjectManagementTools.analyze_project_scope,
+                ArchitectureTools.design_system_architecture
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Plan Update Coordinator created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("===============================================")
+        return agent
+
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
@@ -387,6 +508,51 @@ class Rscrew():
         debug_print("====================================")
         return task
 
+    # Flag-Based Planning System Tasks
+    @task
+    def plan_generation_task(self) -> Task:
+        debug_print("=== Creating Plan Generation Task ===")
+        task = Task(
+            config=self.tasks_config['plan_generation_task'], # type: ignore[index]
+            agent=self.solution_architect()
+        )
+        debug_print(f"Plan Generation task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("======================================")
+        return task
+
+    @task
+    def plan_based_implementation_task(self) -> Task:
+        debug_print("=== Creating Plan-Based Implementation Task ===")
+        task = Task(
+            config=self.tasks_config['plan_based_implementation_task'], # type: ignore[index]
+            agent=self.code_implementer()
+        )
+        debug_print(f"Plan-Based Implementation task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("===============================================")
+        return task
+
+    @task
+    def plan_assessment_task(self) -> Task:
+        debug_print("=== Creating Plan Assessment Task ===")
+        task = Task(
+            config=self.tasks_config['plan_assessment_task'], # type: ignore[index]
+            agent=self.plan_update_coordinator()
+        )
+        debug_print(f"Plan Assessment task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("=====================================")
+        return task
+
+    @task
+    def plan_update_task(self) -> Task:
+        debug_print("=== Creating Plan Update Task ===")
+        task = Task(
+            config=self.tasks_config['plan_update_task'], # type: ignore[index]
+            agent=self.plan_update_coordinator()
+        )
+        debug_print(f"Plan Update task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("==================================")
+        return task
+
     def run_with_interactive_dialogue(self, inputs: Dict[str, Any]) -> str:
         """
         Run the crew with interactive operator dialogue for enhanced context
@@ -452,3 +618,175 @@ class Rscrew():
         debug_print("Crew created successfully with Tenacity-based LLM error handling")
         debug_print("====================")
         return crew
+
+    # Flag-Based Planning System Crews (without @crew decorator)
+    def planning_crew(self) -> Crew:
+        """Creates a crew for plan generation (rc -plan)"""
+        debug_print("=== Creating Planning Crew ===")
+        
+        planning_agents = [
+            self.project_orchestrator(),
+            self.research_analyst(),
+            self.solution_architect()
+        ]
+        
+        planning_tasks = [
+            self.plan_generation_task()
+        ]
+        
+        # Apply Tenacity-based LLM error handling to planning agents
+        robust_agents = apply_tenacity_error_handling_to_agents(planning_agents)
+        
+        crew = Crew(
+            agents=robust_agents,
+            tasks=planning_tasks,
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        debug_print("Planning Crew created successfully")
+        debug_print("=================================")
+        return crew
+
+    def implementation_crew(self) -> Crew:
+        """Creates a crew for plan-based implementation (rc -build)"""
+        debug_print("=== Creating Implementation Crew ===")
+        
+        implementation_agents = [
+            self.code_implementer(),
+            self.quality_assurance(),
+            self.technical_writer()
+        ]
+        
+        implementation_tasks = [
+            self.plan_based_implementation_task(),
+            self.quality_assurance_task(),
+            self.documentation_task()
+        ]
+        
+        # Apply Tenacity-based LLM error handling to implementation agents
+        robust_agents = apply_tenacity_error_handling_to_agents(implementation_agents)
+        
+        crew = Crew(
+            agents=robust_agents,
+            tasks=implementation_tasks,
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        debug_print("Implementation Crew created successfully")
+        debug_print("=======================================")
+        return crew
+
+    def route_update_request(self, user_request: str) -> Agent:
+        """Route update request to appropriate specialist agent"""
+        debug_print(f"=== Routing Update Request: {user_request[:50]}... ===")
+        
+        # Simple keyword-based routing for now
+        request_lower = user_request.lower()
+        
+        if any(keyword in request_lower for keyword in ['auth', 'login', 'security', 'oauth', 'permission', 'access']):
+            debug_print("Routing to Security Architecture Specialist")
+            return self.security_architecture_specialist()
+        elif any(keyword in request_lower for keyword in ['database', 'db', 'sql', 'postgres', 'mysql', 'mongo', 'data']):
+            debug_print("Routing to Database Architecture Specialist")
+            return self.database_architecture_specialist()
+        elif any(keyword in request_lower for keyword in ['frontend', 'ui', 'react', 'vue', 'angular', 'css', 'html', 'javascript']):
+            debug_print("Routing to Frontend Architecture Specialist")
+            return self.frontend_architecture_specialist()
+        elif any(keyword in request_lower for keyword in ['deploy', 'docker', 'kubernetes', 'aws', 'cloud', 'infrastructure', 'ci/cd']):
+            debug_print("Routing to Infrastructure Specialist")
+            return self.infrastructure_specialist()
+        elif any(keyword in request_lower for keyword in ['feature', 'functionality', 'business', 'requirement', 'user story']):
+            debug_print("Routing to Feature Analyst")
+            return self.feature_analyst()
+        else:
+            debug_print("Routing to Plan Update Coordinator (general)")
+            return self.plan_update_coordinator()
+
+    def assess_and_preview_change(self, current_plan: str, user_request: str, agent: Agent) -> dict:
+        """Assess feasibility and generate preview of changes"""
+        debug_print(f"=== Assessing Change with {getattr(agent, 'role', 'Unknown')} ===")
+        
+        # Determine change type based on agent
+        agent_role = getattr(agent, 'role', '').lower()
+        if 'security' in agent_role:
+            change_type = 'SECURITY'
+        elif 'database' in agent_role:
+            change_type = 'DATABASE'
+        elif 'frontend' in agent_role:
+            change_type = 'FRONTEND'
+        elif 'infrastructure' in agent_role:
+            change_type = 'INFRASTRUCTURE'
+        elif 'feature' in agent_role:
+            change_type = 'FEATURE'
+        else:
+            change_type = 'GENERAL'
+        
+        assessment_task = Task(
+            config=self.tasks_config['plan_assessment_task'], # type: ignore[index]
+            agent=agent
+        )
+        
+        inputs = {
+            'current_plan': current_plan,
+            'user_request': user_request,
+            'change_type': change_type
+        }
+        
+        try:
+            result = assessment_task.execute(context=inputs)
+            return self.parse_assessment_result(result.raw if hasattr(result, 'raw') else str(result))
+        except Exception as e:
+            debug_print(f"Error in assessment: {e}")
+            return {
+                'assessment': f"Error assessing change: {e}",
+                'impact': "Unknown",
+                'considerations': "Assessment failed",
+                'risks': "Unknown risks",
+                'recommendations': "Please try again",
+                'implementation_approach': "Manual review needed"
+            }
+
+    def parse_assessment_result(self, result_text: str) -> dict:
+        """Parse assessment result into structured format"""
+        debug_print("=== Parsing Assessment Result ===")
+        
+        # Simple parsing - look for section headers
+        sections = {
+            'assessment': '',
+            'impact': '',
+            'considerations': '',
+            'risks': '',
+            'recommendations': '',
+            'implementation_approach': ''
+        }
+        
+        lines = result_text.split('\n')
+        current_section = None
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('ASSESSMENT:'):
+                current_section = 'assessment'
+                sections[current_section] = line.replace('ASSESSMENT:', '').strip()
+            elif line.startswith('IMPACT:'):
+                current_section = 'impact'
+                sections[current_section] = line.replace('IMPACT:', '').strip()
+            elif line.startswith('CONSIDERATIONS:'):
+                current_section = 'considerations'
+                sections[current_section] = line.replace('CONSIDERATIONS:', '').strip()
+            elif line.startswith('RISKS:'):
+                current_section = 'risks'
+                sections[current_section] = line.replace('RISKS:', '').strip()
+            elif line.startswith('RECOMMENDATIONS:'):
+                current_section = 'recommendations'
+                sections[current_section] = line.replace('RECOMMENDATIONS:', '').strip()
+            elif line.startswith('IMPLEMENTATION_APPROACH:'):
+                current_section = 'implementation_approach'
+                sections[current_section] = line.replace('IMPLEMENTATION_APPROACH:', '').strip()
+            elif current_section and line:
+                sections[current_section] += ' ' + line
+        
+        debug_print("Assessment parsing complete")
+        return sections

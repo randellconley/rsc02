@@ -269,3 +269,144 @@ documentation_task:
     - Testing and quality assurance procedures
     Format as professional documentation ready for end users and developers.
   agent: technical_writer
+
+# Flag-Based Planning System Tasks
+
+plan_generation_task:
+  description: >
+    Generate a comprehensive implementation plan based on the user request:
+    
+    User Request: {topic}
+    Execution Context: {execution_context}
+    Current Year: {current_year}
+    
+    Create a detailed implementation plan that includes:
+    1. Executive Summary - What will be built (high-level overview)
+    2. Technical Architecture - System design, technologies, frameworks
+    3. Implementation Roadmap - Step-by-step plan with milestones and phases
+    4. Resource Requirements - Dependencies, tools, libraries needed
+    5. Risk Assessment - Potential issues and mitigation strategies
+    6. Success Criteria - How to measure completion and success
+    7. File Structure - Proposed directory/file organization
+    8. Implementation Notes - Additional context for implementation crew
+    
+    Format as structured markdown that can be easily reviewed and used by implementation crew.
+  expected_output: >
+    # Implementation Plan: [Project Title]
+    
+    ## Executive Summary
+    [What will be built - high level overview]
+    
+    ## Technical Architecture  
+    [System design, technologies, frameworks]
+    
+    ## Implementation Roadmap
+    [Step-by-step plan with milestones]
+    - [ ] Phase 1: Setup and foundation
+    - [ ] Phase 2: Core functionality  
+    - [ ] Phase 3: Testing and refinement
+    
+    ## Resource Requirements
+    [Dependencies, tools, libraries needed]
+    
+    ## Risk Assessment
+    [Potential issues and mitigation strategies]
+    
+    ## Success Criteria
+    [How to measure completion and success]
+    
+    ## File Structure
+    [Proposed directory/file organization]
+    
+    ## Implementation Notes
+    [Additional context for the implementation crew]
+  agent: solution_architect
+
+plan_based_implementation_task:
+  description: >
+    Implement the project according to the provided implementation plan:
+    
+    Implementation Plan: {implementation_plan}
+    User Request: {topic}
+    
+    Follow the plan specifications exactly:
+    1. Use the specified technical architecture and technologies
+    2. Follow the implementation roadmap and phases
+    3. Create the proposed file structure
+    4. Implement all features and requirements outlined in the plan
+    5. Follow the resource requirements and dependencies
+    6. Address the identified risks and mitigation strategies
+    7. Ensure the success criteria can be met
+    
+    Create production-ready code that matches the plan specifications.
+  expected_output: >
+    Complete implementation based on the plan including:
+    - All source code files following the planned structure
+    - Implementation of all features specified in the plan
+    - Proper error handling and input validation
+    - Security implementations as outlined in the plan
+    - Performance optimizations where specified
+    - Installation and setup instructions
+    - Code documentation and comments
+    Format as ready-to-deploy code matching the implementation plan.
+  agent: code_implementer
+
+plan_assessment_task:
+  description: >
+    Assess the feasibility and impact of a requested plan change:
+    
+    Current Plan: {current_plan}
+    Requested Change: {user_request}
+    Change Type: {change_type}
+    
+    Provide a comprehensive assessment including:
+    1. Feasibility analysis - Is this change technically possible and practical?
+    2. Impact assessment - What parts of the plan will be affected?
+    3. Technical considerations - What technical implications does this have?
+    4. Resource implications - How does this affect dependencies and requirements?
+    5. Risk analysis - What new risks does this introduce?
+    6. Recommendations - Should this change be made? Any alternatives?
+    7. Implementation approach - How should this change be integrated?
+    
+    Be thorough but concise in your assessment.
+  expected_output: >
+    ASSESSMENT: [Feasibility and recommendations]
+    
+    IMPACT: [What parts of the plan will be affected]
+    
+    CONSIDERATIONS: [Technical implications and requirements]
+    
+    RISKS: [New risks and mitigation strategies]
+    
+    RECOMMENDATIONS: [Whether to proceed and any alternatives]
+    
+    IMPLEMENTATION_APPROACH: [How to integrate this change]
+  agent: plan_update_coordinator
+
+plan_update_task:
+  description: >
+    Update the implementation plan based on the assessment and user request:
+    
+    Current Plan: {current_plan}
+    Assessment Results: {assessment_results}
+    Requested Change: {user_request}
+    
+    Update the plan to incorporate the requested change while:
+    1. Maintaining consistency across all sections
+    2. Preserving existing content that isn't affected
+    3. Updating all relevant sections that are impacted
+    4. Ensuring technical coherence and feasibility
+    5. Maintaining the same markdown structure and format
+    6. Adding new requirements or dependencies as needed
+    
+    Only modify the sections that need to change based on the request.
+  expected_output: >
+    Updated implementation plan in the same markdown format with:
+    - Modified sections reflecting the requested changes
+    - Updated technical architecture if needed
+    - Revised implementation roadmap if phases changed
+    - Updated resource requirements and dependencies
+    - Revised risk assessment with new considerations
+    - Maintained consistency across all sections
+    Format as complete implementation plan ready for review.
+  agent: plan_update_coordinator

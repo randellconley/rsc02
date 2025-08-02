@@ -2,6 +2,7 @@
 """
 RC - RSCrew Command Runner
 A global command interface for running the RSCrew multi-agent system from anywhere.
+Supports flag-based planning system: -plan, -build, -update
 """
 
 import sys
@@ -11,6 +12,7 @@ from pathlib import Path
 from datetime import datetime
 from rscrew.crew import Rscrew
 from rscrew.output_capture import capture_output
+from rscrew.plan_manager import PlanManager, InteractivePlanSession
 
 def read_prompt_file(file_path):
     """Read prompt from a file."""
@@ -169,58 +171,217 @@ def run_crew_with_prompt(user_prompt):
         
         sys.exit(1)
 
+def run_plan_generation(prompt: str, plan_name: str = None) -> str:
+    """Generate an implementation plan"""
+    print("🚀 Starting Plan Generation...")
+    print(f"💭 Request: {prompt}")
+    print("=" * 60)
+    
+    # Initialize plan manager
+    plan_manager = PlanManager()
+    
+    # Generate plan filename
+    plan_filename = plan_manager.generate_plan_name(plan_name)
+    plan_path = plan_manager.get_plan_path(plan_filename)
+    
+    # Prepare inputs for planning crew
+    inputs = {
+        'topic': prompt,
+        'current_year': str(datetime.now().year),
+        'execution_context': get_execution_context()
+    }
+    
+    try:
+        # Create crew instance and run planning crew
+        crew_instance = Rscrew()
+        planning_crew = crew_instance.planning_crew()
+        result = planning_crew.kickoff(inputs=inputs)
+        
+        # Extract plan content from result
+        plan_content = result.raw if hasattr(result, 'raw') else str(result)
+        
+        # Save plan to file
+        plan_manager.save_plan(plan_content, plan_path)
+        
+        print("\n" + "="*60)
+        print("✅ Plan generation completed successfully!")
+        print(f"📄 Plan saved to: {plan_path}")
+        print("="*60)
+        
+        return str(plan_path)
+        
+    except Exception as e:
+        print(f"❌ Error generating plan: {e}")
+        sys.exit(1)
+
+def run_plan_implementation(plan_path: str) -> None:
+    """Implement from an existing plan"""
+    print("🚀 Starting Plan Implementation...")
+    print(f"📄 Plan file: {plan_path}")
+    print("=" * 60)
+    
+    # Initialize plan manager
+    plan_manager = PlanManager()
+    plan_file_path = Path(plan_path)
+    
+    # Validate plan file exists
+    if not plan_file_path.exists():
+        print(f"❌ Error: Plan file not found: {plan_path}")
+        sys.exit(1)
+    
+    try:
+        # Load and validate plan
+        plan_content = plan_manager.load_plan(plan_file_path)
+        is_valid, missing_sections = plan_manager.validate_plan(plan_content)
+        
+        if not is_valid:
+            print("❌ Error: Plan file is missing required sections:")
+            for section in missing_sections:
+                print(f"  - {section}")
+            sys.exit(1)
+        
+        # Prepare inputs for implementation crew
+        inputs = {
+            'topic': plan_manager.extract_plan_title(plan_content),
+            'implementation_plan': plan_content,
+            'current_year': str(datetime.now().year)
+        }
+        
+        # Create crew instance and run implementation crew
+        crew_instance = Rscrew()
+        implementation_crew = crew_instance.implementation_crew()
+        result = implementation_crew.kickoff(inputs=inputs)
+        
+        print("\n" + "="*60)
+        print("✅ Implementation completed successfully!")
+        print("="*60)
+        
+    except Exception as e:
+        print(f"❌ Error implementing plan: {e}")
+        sys.exit(1)
+
+def run_plan_update(plan_path: str) -> None:
+    """Start interactive plan update session"""
+    print("🚀 Starting Interactive Plan Update...")
+    print(f"📄 Plan file: {plan_path}")
+    print("=" * 60)
+    
+    # Initialize plan manager
+    plan_manager = PlanManager()
+    plan_file_path = Path(plan_path)
+    
+    # Validate plan file exists
+    if not plan_file_path.exists():
+        print(f"❌ Error: Plan file not found: {plan_path}")
+        sys.exit(1)
+    
+    try:
+        # Validate plan
+        plan_content = plan_manager.load_plan(plan_file_path)
+        is_valid, missing_sections = plan_manager.validate_plan(plan_content)
+        
+        if not is_valid:
+            print("⚠️  Warning: Plan file is missing some sections:")
+            for section in missing_sections:
+                print(f"  - {section}")
+            print("Continuing with interactive update...\n")
+        
+        # Start interactive session
+        session = InteractivePlanSession(plan_file_path, plan_manager)
+        session.run()
+        
+    except Exception as e:
+        print(f"❌ Error updating plan: {e}")
+        sys.exit(1)
+
 def run():
     """
     Main entry point for the RC command.
-    Handles command line arguments and executes the crew with custom prompts.
+    Handles flag-based planning system and legacy prompt mode.
     """
     parser = argparse.ArgumentParser(
-        description='RC - RSCrew Command Runner. Run CrewAI analysis from anywhere.',
+        description='RC - RSCrew Command Runner. Flag-based planning system.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Flag-Based Planning System:
+  rc -plan "Build a web app" [-name my_app]     Generate implementation plan
+  rc -build /path/to/plan.md                   Implement from plan
+  rc -update /path/to/plan.md                  Interactive plan updates
+
+Legacy Mode:
+  rc Please analyze this project                Traditional crew execution
+  rc -f /path/to/prompt.txt                    Read prompt from file
+
 Examples:
-  rc Please analyze this project and suggest improvements
-  rc -f /path/to/prompt.txt
-  rc Review the code in ./src/ and identify potential bugs
+  rc -plan "Create a REST API for user management"
+  rc -plan "Build a task tracker" -name task_manager
+  rc -build ./plans/task_manager.md
+  rc -update ./plans/task_manager.md
         """
     )
     
+    # Flag-based planning arguments
+    parser.add_argument(
+        '-plan',
+        help='Generate implementation plan from prompt'
+    )
+    
+    parser.add_argument(
+        '-name',
+        help='Custom name for plan file (optional, auto-adds .md extension)'
+    )
+    
+    parser.add_argument(
+        '-build',
+        help='Implement from existing plan file'
+    )
+    
+    parser.add_argument(
+        '-update',
+        help='Start interactive plan update session'
+    )
+    
+    # Legacy arguments
     parser.add_argument(
         '-f', '--file',
-        help='Read prompt from a file instead of command line arguments'
+        help='Read prompt from a file (legacy mode)'
     )
     
     parser.add_argument(
         'prompt',
         nargs='*',
-        help='The prompt/request for the CrewAI agents (ignored if -f is used)'
+        help='The prompt/request for the CrewAI agents (legacy mode)'
     )
     
     # Parse arguments
     args = parser.parse_args()
     
-    # Determine the prompt source
-    if args.file:
-        # Read prompt from file
+    # Flag-based planning system
+    if args.plan:
+        run_plan_generation(args.plan, args.name)
+    elif args.build:
+        run_plan_implementation(args.build)
+    elif args.update:
+        run_plan_update(args.update)
+    # Legacy mode
+    elif args.file:
         user_prompt = read_prompt_file(args.file)
+        run_crew_with_prompt(user_prompt)
     elif args.prompt:
-        # Use command line arguments as prompt
         user_prompt = ' '.join(args.prompt)
+        run_crew_with_prompt(user_prompt)
     else:
-        # No prompt provided
-        print("❌ Error: No prompt provided. Use either:")
+        # No arguments provided
+        print("❌ Error: No command provided. Use either:")
+        print("\nFlag-based planning:")
+        print("  rc -plan \"Your request here\" [-name plan_name]")
+        print("  rc -build /path/to/plan.md")
+        print("  rc -update /path/to/plan.md")
+        print("\nLegacy mode:")
         print("  rc Your prompt here")
         print("  rc -f /path/to/prompt.txt")
         print("\nUse 'rc --help' for more information.")
         sys.exit(1)
-    
-    # Validate prompt
-    if not user_prompt.strip():
-        print("❌ Error: Empty prompt provided.")
-        sys.exit(1)
-    
-    # Run the crew with the custom prompt
-    run_crew_with_prompt(user_prompt)
 
 if __name__ == "__main__":
     run()
