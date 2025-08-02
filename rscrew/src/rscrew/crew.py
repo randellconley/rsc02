@@ -12,7 +12,7 @@ from rscrew.tools.custom_tool import (
 # Version information for deployment tracking
 RSCREW_VERSION = "v2.1-retry-enhanced"
 RSCREW_FEATURES = ["retry-logic", "context-monitoring", "graceful-fallback"]
-RSCREW_COMMIT = "4ed950e"  # Version tracking system commit
+RSCREW_COMMIT = "0b5f8b0"  # Version tracking system commit
 
 # Debug toggle - set to False to disable debug output
 DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
