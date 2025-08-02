@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 from rscrew.crew import Rscrew
+from rscrew.output_capture import capture_output
 
 def read_prompt_file(file_path):
     """Read prompt from a file."""
@@ -46,6 +47,27 @@ EXECUTION CONTEXT:
 """
     return context
 
+class OutputLogger:
+    """Custom logger to capture all output during RC execution"""
+    
+    def __init__(self):
+        self.output_buffer = []
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+    
+    def write(self, text):
+        # Write to original stdout/stderr for real-time display
+        self.original_stdout.write(text)
+        self.original_stdout.flush()
+        # Also capture for later saving
+        self.output_buffer.append(text)
+    
+    def flush(self):
+        self.original_stdout.flush()
+    
+    def get_captured_output(self):
+        return ''.join(self.output_buffer)
+
 def run_crew_with_prompt(user_prompt):
     """Run the crew with a custom prompt using interactive dialogue."""
     # Check if debug mode is enabled
@@ -56,6 +78,7 @@ def run_crew_with_prompt(user_prompt):
             print(f"[DEBUG] {message}")
     
     execution_context = get_execution_context()
+    working_dir = os.getcwd()
     
     # Prepare initial inputs
     inputs = {
@@ -71,10 +94,17 @@ def run_crew_with_prompt(user_prompt):
     debug_print(f"Execution context length: {len(inputs['execution_context'])}")
     debug_print("===============================")
     
+    # Set up output capture
+    output_logger = OutputLogger()
+    
     try:
         print("🚀 Starting RSCrew with Interactive Operator Dialogue...")
-        print(f"📍 Working from: {os.getcwd()}")
+        print(f"📍 Working from: {working_dir}")
         print(f"💭 Request: {user_prompt}")
+        print("=" * 60)
+        
+        # Start capturing output (but allow interactive input)
+        sys.stdout = output_logger
         
         debug_print("Creating Rscrew instance...")
         crew_instance = Rscrew()
@@ -84,18 +114,59 @@ def run_crew_with_prompt(user_prompt):
         result = crew_instance.run_with_interactive_dialogue(inputs)
         debug_print("Interactive workflow completed")
         
+        # Restore original stdout
+        sys.stdout = output_logger.original_stdout
+        
         print("\n" + "="*60)
         print("✅ RSCrew completed successfully!")
         print("="*60)
+        
+        # Get captured output
+        captured_output = output_logger.get_captured_output()
+        
+        # Save output to file
+        command_summary = f"rc {user_prompt[:50]}{'...' if len(user_prompt) > 50 else ''}"
+        try:
+            capture_output(
+                prompt=user_prompt,
+                output=captured_output,
+                working_dir=working_dir,
+                command=command_summary
+            )
+        except Exception as capture_error:
+            print(f"[OUTPUT] Warning: Could not save output - {capture_error}")
+        
         return result
         
     except Exception as e:
+        # Restore original stdout in case of error
+        sys.stdout = output_logger.original_stdout
+        
         debug_print(f"Exception type: {type(e).__name__}")
         debug_print(f"Exception args: {e.args}")
+        
+        # Get any captured output before the error
+        captured_output = output_logger.get_captured_output()
+        error_output = captured_output + f"\n--- ERROR ---\n{str(e)}"
+        
         print(f"❌ Error occurred while running the crew: {e}")
         if debug_mode:
             import traceback
             traceback.print_exc()
+            error_output += f"\n--- TRACEBACK ---\n{traceback.format_exc()}"
+        
+        # Save error output to file
+        command_summary = f"rc {user_prompt[:50]}{'...' if len(user_prompt) > 50 else ''} [ERROR]"
+        try:
+            capture_output(
+                prompt=user_prompt,
+                output=error_output,
+                working_dir=working_dir,
+                command=command_summary
+            )
+        except Exception as capture_error:
+            print(f"[OUTPUT] Warning: Could not save error output - {capture_error}")
+        
         sys.exit(1)
 
 def run():

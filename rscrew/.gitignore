@@ -6,8 +6,10 @@ __pycache__/
 report.md
 *.report.md
 reports/
-output/
 .prompt/
+
+# Console output archive (auto-generated)
+output/
 
 # Debug and log files
 debug.log
