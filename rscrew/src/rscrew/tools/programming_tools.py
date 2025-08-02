@@ -10,6 +10,234 @@ from typing import Dict, List, Optional
 from crewai.tools import tool
 
 
+class OperatorIntentTools:
+    """Tools for the Operator Intent Interpreter agent"""
+    
+    @tool
+    @staticmethod
+    def analyze_request_for_context_gaps(user_request: str, execution_context: str) -> str:
+        """
+        Analyze user request to identify key context gaps that need clarification.
+        
+        Args:
+            user_request (str): The user's original request
+            execution_context (str): Context about where the command was executed
+            
+        Returns:
+            str: Analysis of context gaps and suggested question areas
+        """
+        request_lower = user_request.lower()
+        
+        # Identify what type of request this appears to be
+        context_gaps = []
+        question_priorities = []
+        
+        # Technical context gaps
+        if any(tech in request_lower for tech in ['api', 'web', 'app', 'system', 'database', 'server']):
+            if not any(lang in request_lower for lang in ['python', 'javascript', 'java', 'go', 'rust', 'php', 'ruby']):
+                context_gaps.append("Missing tech stack/language preference")
+                question_priorities.append(("tech_stack", 1, "What's your preferred programming language or current tech stack?"))
+        
+        # Experience level gaps
+        if any(word in request_lower for word in ['create', 'build', 'implement', 'develop']):
+            if not any(level in request_lower for level in ['simple', 'basic', 'advanced', 'production', 'enterprise']):
+                context_gaps.append("Missing complexity/experience level")
+                question_priorities.append(("experience", 2, "Are you looking for a simple learning example or a production-ready solution?"))
+        
+        # Purpose gaps
+        if not any(purpose in request_lower for purpose in ['learn', 'production', 'work', 'personal', 'experiment']):
+            context_gaps.append("Missing project purpose/context")
+            question_priorities.append(("purpose", 1, "Is this for learning, a personal project, or production use?"))
+        
+        # Scope gaps
+        if any(word in request_lower for word in ['system', 'platform', 'application']):
+            if not any(scope in request_lower for scope in ['prototype', 'mvp', 'full', 'complete', 'basic']):
+                context_gaps.append("Missing scope definition")
+                question_priorities.append(("scope", 3, "Are you looking for a quick prototype or a comprehensive solution?"))
+        
+        # Integration gaps
+        if any(word in request_lower for word in ['api', 'database', 'auth', 'user']):
+            context_gaps.append("Potential integration requirements")
+            question_priorities.append(("integration", 4, "Do you have existing systems this needs to integrate with, or starting from scratch?"))
+        
+        # Sort questions by priority
+        question_priorities.sort(key=lambda x: x[1])
+        
+        analysis = f"""
+REQUEST ANALYSIS FOR CONTEXT GAPS
+=================================
+
+USER REQUEST: {user_request}
+EXECUTION CONTEXT: {execution_context}
+
+IDENTIFIED CONTEXT GAPS:
+{chr(10).join(f"- {gap}" for gap in context_gaps)}
+
+SUGGESTED QUESTION SEQUENCE:
+{chr(10).join(f"{i+1}. {q[2]}" for i, q in enumerate(question_priorities[:5]))}
+
+QUESTION CATEGORIES TO EXPLORE:
+- Technical Context: Stack, experience, existing systems
+- Purpose & Scope: Learning vs production, timeline, complexity
+- Requirements: Features, constraints, integration needs
+- Operator Style: Preferences, past experiences, next steps
+
+DIALOGUE APPROACH:
+- Start with highest priority questions
+- Adapt subsequent questions based on answers
+- Keep conversational and CLI-friendly
+- Limit to 3-5 questions total
+        """
+        
+        return analysis.strip()
+    
+    @tool
+    @staticmethod
+    def generate_contextual_question(question_number: int, total_questions: int, user_request: str, previous_answers: str = "") -> str:
+        """
+        Generate the next contextual question based on request analysis and previous answers.
+        
+        Args:
+            question_number (int): Current question number (1-5)
+            total_questions (int): Total planned questions (3-5)
+            user_request (str): Original user request
+            previous_answers (str): Previous Q&A pairs for context
+            
+        Returns:
+            str: Next contextual question with progress indicator
+        """
+        request_lower = user_request.lower()
+        
+        # Base questions by priority
+        base_questions = []
+        
+        # Question 1: Usually tech stack or purpose
+        if question_number == 1:
+            if any(tech in request_lower for tech in ['api', 'web', 'app', 'system']):
+                base_questions.append("What's your preferred programming language or current tech stack?")
+            else:
+                base_questions.append("What's the context for this request - learning, personal project, or work?")
+        
+        # Question 2: Usually purpose or scope
+        elif question_number == 2:
+            if "tech stack" in previous_answers.lower() or "language" in previous_answers.lower():
+                base_questions.append("Is this for learning, a personal project, or production use?")
+            else:
+                base_questions.append("What's your experience level with this technology?")
+        
+        # Question 3: Usually scope or requirements
+        elif question_number == 3:
+            if "production" in previous_answers.lower():
+                base_questions.append("Do you want something robust from the start, or prefer to start simple and expand?")
+            elif "learning" in previous_answers.lower():
+                base_questions.append("Are you looking for a comprehensive example or just the basics to get started?")
+            else:
+                base_questions.append("What's your timeline and complexity preference for this?")
+        
+        # Question 4: Usually specific requirements
+        elif question_number == 4:
+            if any(word in request_lower for word in ['user', 'auth', 'login', 'management']):
+                base_questions.append("Do you need authentication, user roles, or just basic CRUD operations?")
+            elif any(word in request_lower for word in ['api', 'database', 'data']):
+                base_questions.append("Any specific requirements for data storage, authentication, or integrations?")
+            else:
+                base_questions.append("Are there any specific features or constraints I should know about?")
+        
+        # Question 5: Usually integration or next steps
+        elif question_number == 5:
+            base_questions.append("Are you starting from scratch or integrating with existing systems?")
+        
+        # Select most appropriate question
+        question = base_questions[0] if base_questions else "What additional context would help me understand your needs better?"
+        
+        return f"**Question {question_number}/{total_questions}**: {question}"
+    
+    @tool
+    @staticmethod
+    def synthesize_operator_context(user_request: str, qa_dialogue: str, execution_context: str) -> str:
+        """
+        Synthesize the Q&A dialogue into comprehensive operator context.
+        
+        Args:
+            user_request (str): Original user request
+            qa_dialogue (str): Complete Q&A dialogue
+            execution_context (str): Execution context
+            
+        Returns:
+            str: Comprehensive operator context synthesis
+        """
+        # Parse the dialogue to extract key insights
+        dialogue_lower = qa_dialogue.lower()
+        
+        # Technical background analysis
+        tech_background = "Unknown"
+        if any(lang in dialogue_lower for lang in ['python', 'javascript', 'java', 'go', 'rust', 'php', 'ruby']):
+            mentioned_langs = [lang for lang in ['python', 'javascript', 'java', 'go', 'rust', 'php', 'ruby'] if lang in dialogue_lower]
+            tech_background = f"Experienced with {', '.join(mentioned_langs)}"
+        
+        # Project context analysis
+        project_context = "General request"
+        if "learning" in dialogue_lower:
+            project_context = "Learning/Educational"
+        elif "production" in dialogue_lower:
+            project_context = "Production/Professional"
+        elif "personal" in dialogue_lower:
+            project_context = "Personal Project"
+        
+        # Complexity preference
+        complexity_pref = "Moderate"
+        if any(word in dialogue_lower for word in ['simple', 'basic', 'minimal']):
+            complexity_pref = "Simple/Minimal"
+        elif any(word in dialogue_lower for word in ['robust', 'production', 'comprehensive']):
+            complexity_pref = "Robust/Comprehensive"
+        elif any(word in dialogue_lower for word in ['enterprise', 'scalable', 'advanced']):
+            complexity_pref = "Advanced/Enterprise"
+        
+        # Identify unstated needs
+        unstated_needs = []
+        if any(word in user_request.lower() for word in ['user', 'auth', 'login']):
+            if "auth" not in dialogue_lower:
+                unstated_needs.append("Likely needs authentication system")
+        if any(word in user_request.lower() for word in ['api', 'data']):
+            if "database" not in dialogue_lower:
+                unstated_needs.append("Probably needs data persistence")
+        if "production" in dialogue_lower and "test" not in dialogue_lower:
+            unstated_needs.append("Should include testing strategy")
+        
+        synthesis = f"""
+OPERATOR CONTEXT SYNTHESIS
+=========================
+
+ORIGINAL REQUEST: {user_request}
+EXECUTION CONTEXT: {execution_context}
+
+DIALOGUE SUMMARY:
+{qa_dialogue}
+
+OPERATOR PROFILE:
+- Technical Background: {tech_background}
+- Project Context: {project_context}
+- Complexity Preference: {complexity_pref}
+- Experience Level: Inferred from tech stack and requirements
+
+UNSTATED NEEDS IDENTIFIED:
+{chr(10).join(f"- {need}" for need in unstated_needs) if unstated_needs else "- None identified"}
+
+ENHANCED REQUEST:
+{user_request}
+
+CONTEXT FOR TEAM:
+The operator is requesting the above with the following context: {project_context.lower()} with {complexity_pref.lower()} approach, using {tech_background.lower()}. Consider their experience level and the unstated needs identified above when crafting the solution.
+
+RECOMMENDED APPROACH:
+- Tailor complexity to operator's preference and experience
+- Include solutions for identified unstated needs
+- Provide appropriate level of explanation and documentation
+- Consider operator's likely next steps and future needs
+        """
+        
+        return synthesis.strip()
+
 class ProjectManagementTools:
     """Tools for the Project Orchestrator agent"""
     

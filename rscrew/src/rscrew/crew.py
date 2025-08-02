@@ -9,7 +9,7 @@ from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
 )
 from rscrew.tools.programming_tools import (
-    ProjectManagementTools, TechnicalResearchTools, ArchitectureTools,
+    OperatorIntentTools, ProjectManagementTools, TechnicalResearchTools, ArchitectureTools,
     DevelopmentTools, QualityAssuranceTools, DocumentationTools
 )
 
@@ -136,6 +136,28 @@ class Rscrew():
     # If you would like to add tools to your agents, you can learn more about it here:
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
+    def operator_intent_interpreter(self) -> Agent:
+        debug_print("=== Creating Operator Intent Interpreter Agent ===")
+        
+        llm = create_llm_with_monitoring("operator_intent_interpreter")
+        
+        agent = Agent(
+            config=self.agents_config['operator_intent_interpreter'], # type: ignore[index]
+            tools=[
+                OperatorIntentTools.analyze_request_for_context_gaps,
+                OperatorIntentTools.generate_contextual_question,
+                OperatorIntentTools.synthesize_operator_context
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Operator Intent Interpreter created with role: {getattr(agent, 'role', 'Unknown').strip()}")
+        debug_print(f"Tools: {[tool.__name__ if hasattr(tool, '__name__') else str(tool) for tool in agent.tools]}")
+        debug_print("=====================================================")
+        return agent
+
+    @agent
     def project_orchestrator(self) -> Agent:
         debug_print("=== Creating Project Orchestrator Agent ===")
         llm = create_llm_with_monitoring("Project Orchestrator")
@@ -259,6 +281,17 @@ class Rscrew():
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
+    @task
+    def operator_intent_dialogue_task(self) -> Task:
+        debug_print("=== Creating Operator Intent Dialogue Task ===")
+        task = Task(
+            config=self.tasks_config['operator_intent_dialogue_task'], # type: ignore[index]
+            agent=self.operator_intent_interpreter()
+        )
+        debug_print(f"Operator Intent Dialogue task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("===============================================")
+        return task
+
     @task
     def intent_classification_task(self) -> Task:
         debug_print("=== Creating Intent Classification Task ===")

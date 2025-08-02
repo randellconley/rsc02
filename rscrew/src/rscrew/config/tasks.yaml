@@ -1,43 +1,80 @@
-intent_classification_task:
+operator_intent_dialogue_task:
   description: >
-    As the Project Orchestrator, analyze the user's request to determine their intent and route to the appropriate workflow:
+    As the Operator Intent Interpreter, conduct a sequential Q&A dialogue to understand the user's context and true intentions:
     
     User Request: {topic}
     Execution Context: {execution_context}
     Current Year: {current_year}
     
-    Classify the request into one of these categories:
+    Your role is to understand the OPERATOR (the user making the request) through intelligent questioning:
     
-    1. INFORMATION REQUEST - User wants to learn, understand, or get explanations about:
-       - "What is...", "How does... work", "Explain...", "What are the differences between..."
-       - "Why should I use...", "What are the pros/cons of..."
-       - Questions seeking knowledge, comparisons, or explanations
-       
-    2. PLANNING REQUEST - User wants strategic advice, recommendations, or planning:
-       - "What's the best approach for...", "How should I structure..."
-       - "What technologies should I use for...", "What would you recommend for..."
-       - "Help me plan...", "What strategy should I use..."
-       
-    3. IMPLEMENTATION REQUEST - User wants something built, created, or implemented:
-       - "Build me...", "Create a...", "Implement...", "Develop..."
-       - "Write code for...", "Generate...", "Make a..."
-       - Clear requests for deliverable outputs
+    DIALOGUE PROCESS:
+    1. Analyze the user's request to identify key context gaps
+    2. Ask ONE targeted question at a time (CLI-friendly)
+    3. Wait for user response before asking next question
+    4. Adapt subsequent questions based on previous answers
+    5. Limit to 3-5 questions total to avoid overwhelming
+    6. Build comprehensive operator context
     
-    Based on your classification, recommend the appropriate workflow:
-    - INFORMATION: Quick response workflow (Research + Documentation)
-    - PLANNING: Strategic planning workflow (Analysis + Research + Architecture)  
-    - IMPLEMENTATION: Full development workflow (All 6 phases)
+    QUESTION CATEGORIES (choose most relevant):
+    - Technical Context: Current tech stack, experience level, existing systems
+    - Purpose & Scope: Learning vs production, timeline, complexity preference
+    - Requirements: Specific features, constraints, integration needs
+    - Operator Style: Preferred approaches, past experiences, next steps
+    
+    DIALOGUE STYLE:
+    - One question at a time with progress indicator (Question 1/5)
+    - Conversational and natural, not interrogative
+    - Build on previous answers to ask smarter follow-ups
+    - Focus on understanding what they're trying to accomplish
+    - Identify what they're NOT saying but might need
+    
+    After gathering sufficient context, synthesize into operator profile for the team.
   expected_output: >
-    Intent classification with recommended workflow:
+    Sequential Q&A dialogue followed by context synthesis:
+    
+    **Question 1/X**: [First targeted question based on request analysis]
+    
+    [Wait for user response, then continue with adaptive questioning until sufficient context]
+    
+    **OPERATOR CONTEXT SYNTHESIS**:
+    - Technical Background: [User's skills, experience, current stack]
+    - Project Context: [Purpose, scope, timeline, constraints]
+    - Operator Style: [Preferences, complexity level, learning goals]
+    - Unstated Needs: [What they probably need but didn't mention]
+    - Next Steps: [What they'll likely need after this]
+    
+    **ENHANCED REQUEST**: [Original request enriched with operator context]
+    
+    Proceeding to intent classification with full operator context...
+  agent: operator_intent_interpreter
+
+intent_classification_task:
+  description: >
+    As the Project Orchestrator, analyze the ENHANCED user request (with operator context) to determine intent and route to appropriate workflow:
+    
+    Enhanced Request: Use the Operator Intent Interpreter's context synthesis
+    Original Request: {topic}
+    Operator Context: Available from previous dialogue
+    Execution Context: {execution_context}
+    Current Year: {current_year}
+    
+    Now classify with full operator context into:
+    
+    1. INFORMATION REQUEST - Operator wants to learn, understand, or get explanations
+    2. PLANNING REQUEST - Operator wants strategic advice, recommendations, or planning  
+    3. IMPLEMENTATION REQUEST - Operator wants something built, created, or implemented
+    
+    Consider the operator's experience level, context, and true intentions when classifying.
+  expected_output: >
+    Enhanced intent classification with operator context:
     
     INTENT: [INFORMATION/PLANNING/IMPLEMENTATION]
     CONFIDENCE: [High/Medium/Low]
-    REASONING: Brief explanation of why this classification was chosen
-    RECOMMENDED_WORKFLOW: [Quick Response/Strategic Planning/Full Development]
+    REASONING: Classification reasoning considering operator context
+    OPERATOR-AWARE WORKFLOW: [Workflow tailored to operator's needs]
     
-    If INFORMATION: Proceed with research_task and documentation_task only
-    If PLANNING: Proceed with project_analysis_task, technical_research_task, and solution_design_task
-    If IMPLEMENTATION: Proceed with full 6-phase workflow
+    Route to appropriate workflow with full operator context available to all agents.
   agent: project_orchestrator
 
 project_analysis_task:
