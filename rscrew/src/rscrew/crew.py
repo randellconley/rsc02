@@ -10,9 +10,9 @@ from rscrew.tools.custom_tool import (
 )
 
 # Version information for deployment tracking
-RSCREW_VERSION = "v2.1-retry-enhanced"
-RSCREW_FEATURES = ["retry-logic", "context-monitoring", "graceful-fallback"]
-RSCREW_COMMIT = "0b5f8b0"  # Version tracking system commit
+RSCREW_VERSION = "v2.2-simplified"
+RSCREW_FEATURES = ["null-response-handling", "debug-monitoring"]
+RSCREW_COMMIT = "simplified"  # Simplified version without retry logic
 
 # Debug toggle - set to False to disable debug output
 DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
@@ -82,7 +82,7 @@ class Rscrew():
                 def fixed_call(*args, **kwargs):
                     if DEBUG_MODE:
                         debug_print(f"=== CrewAI LLM Call Intercepted ({RSCREW_VERSION}) ===")
-                        debug_print(f"Enhanced Features Active: {', '.join(RSCREW_FEATURES)}")
+                        debug_print(f"Features Active: {', '.join(RSCREW_FEATURES)}")
                         debug_print(f"Args count: {len(args)}")
                         debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
                         if args:
@@ -102,47 +102,20 @@ class Rscrew():
                                 debug_print("WARNING: Empty or None prompt detected")
                             return ""
                         
-                        # Check for context length issues
-                        prompt_length = 0
-                        if args and args[0]:
-                            if isinstance(args[0], list):
-                                prompt_length = sum(len(str(item.get('content', ''))) for item in args[0] if isinstance(item, dict))
-                            else:
-                                prompt_length = len(str(args[0]))
+                        result = original_call(*args, **kwargs)
                         
-                        if DEBUG_MODE and prompt_length > 50000:
-                            debug_print(f"WARNING: Large prompt detected ({prompt_length} chars), may cause empty responses")
-                        
-                        # Retry logic for empty responses
-                        max_retries = 3
-                        for attempt in range(max_retries):
-                            result = original_call(*args, **kwargs)
-                            
-                            # Check if result is valid
-                            if result is not None and str(result).strip():
-                                if DEBUG_MODE:
-                                    debug_print(f"LLM call result type: {type(result)}")
-                                    debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
-                                    debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
-                                    debug_print("=== End LLM Call ===")
-                                return result
-                            
-                            # Handle empty/invalid response
+                        # Ensure we return a valid result (convert None to empty string)
+                        if result is None:
                             if DEBUG_MODE:
-                                debug_print(f"WARNING ({RSCREW_VERSION}): LLM returned empty response on attempt {attempt + 1}/{max_retries}")
-                                debug_print(f"Result type: {type(result)}, Result: '{result}'")
-                                if prompt_length > 30000:
-                                    debug_print(f"Large prompt may be causing issues ({prompt_length} chars)")
-                            
-                            # If not the last attempt, wait briefly and retry
-                            if attempt < max_retries - 1:
-                                import time
-                                time.sleep(1.0)  # Longer pause for potential rate limiting
+                                debug_print("WARNING: LLM returned None, converting to empty string")
+                            result = ""
                         
-                        # All retries failed, return a minimal valid response
                         if DEBUG_MODE:
-                            debug_print(f"WARNING ({RSCREW_VERSION}): All retry attempts failed, using graceful fallback")
-                        return "I apologize, but I'm experiencing technical difficulties. Please try again."
+                            debug_print(f"LLM call result type: {type(result)}")
+                            debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
+                            debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
+                            debug_print("=== End LLM Call ===")
+                        return result
                     except Exception as e:
                         if DEBUG_MODE:
                             debug_print(f"LLM call failed: {e}")
@@ -209,7 +182,8 @@ Please respond with a brief analysis of the topic 'hello'."""
                 
                 def fixed_call(*args, **kwargs):
                     if DEBUG_MODE:
-                        debug_print("=== CrewAI LLM Call Intercepted (Reporting Analyst) ===")
+                        debug_print(f"=== CrewAI LLM Call Intercepted (Reporting Analyst - {RSCREW_VERSION}) ===")
+                        debug_print(f"Features Active: {', '.join(RSCREW_FEATURES)}")
                         debug_print(f"Args count: {len(args)}")
                         debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else None}")
                         
@@ -233,7 +207,7 @@ Please respond with a brief analysis of the topic 'hello'."""
                         
                         result = original_call(*args, **kwargs)
                         
-                        # Ensure we return a valid result
+                        # Ensure we return a valid result (convert None to empty string)
                         if result is None:
                             if DEBUG_MODE:
                                 debug_print("WARNING: LLM returned None, converting to empty string (Reporting Analyst)")
