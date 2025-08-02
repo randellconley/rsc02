@@ -1,17 +1,45 @@
 research_task:
   description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is {current_year}.
+    You are working as a Senior Data Researcher. The user has made the following request:
+    
+    {topic}
+    
+    Context about where this command was executed:
+    {execution_context}
+    
+    Based on this request and context, conduct thorough research and analysis.
+    If the user is asking about files or directories, examine them carefully.
+    If they want code analysis, review the code structure and content.
+    If they need improvements or suggestions, provide actionable recommendations.
+    
+    Current year: {current_year}
   expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
+    A comprehensive analysis addressing the user's request. This should include:
+    - Direct response to what the user asked for
+    - Relevant findings from examining the execution context
+    - Specific details about files, code, or content if applicable
+    - Actionable insights and recommendations
+    Format as clear, organized information that directly addresses the user's needs.
   agent: researcher
 
 reporting_task:
   description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
+    You are a Reporting Analyst. Based on the research conducted, create a final response for the user.
+    
+    Original user request: {topic}
+    
+    The researcher has provided analysis. Now create a polished, actionable response that:
+    - Directly answers the user's question or request
+    - Provides clear recommendations if improvements were requested
+    - Includes specific examples or code snippets if relevant
+    - Organizes information in a logical, easy-to-follow structure
+    
+    If the user requested file analysis, include specific findings about those files.
+    If they asked for code review, provide concrete suggestions.
+    If they wanted project analysis, give comprehensive insights.
   expected_output: >
-    A fully fledged report with the main topics, each with a full section of information.
-    Formatted as markdown without '```'
+    A well-structured, actionable response that directly addresses the user's request.
+    Include specific recommendations, examples, and next steps where appropriate.
+    Format as clear markdown without code block markers ('```').
+    Make it practical and immediately useful to the user.
   agent: reporting_analyst
