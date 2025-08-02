@@ -148,6 +148,42 @@ Please respond with a brief analysis of the topic 'hello'."""
         try:
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
             debug_print(f"LLM created: {llm.model}")
+            
+            # Add debug wrapper to reporting analyst LLM as well
+            if DEBUG_MODE and llm and hasattr(llm, 'call'):
+                original_call = llm.call
+                
+                def debug_call(*args, **kwargs):
+                    debug_print("=== CrewAI LLM Call Intercepted (Reporting Analyst) ===")
+                    debug_print(f"Args count: {len(args)}")
+                    debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else None}")
+                    
+                    if args:
+                        debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
+                        debug_print(f"Prompt type: {type(args[0])}")
+                        
+                        if isinstance(args[0], list):
+                            debug_print(f"Prompt is list with {len(args[0])} items")
+                            for i, item in enumerate(args[0][:3]):  # Show first 3 items
+                                debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
+                        else:
+                            debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
+                    
+                    try:
+                        result = original_call(*args, **kwargs)
+                        debug_print(f"LLM call result type: {type(result)}")
+                        debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
+                        debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
+                        debug_print("=== End LLM Call (Reporting Analyst) ===")
+                        return result
+                    except Exception as e:
+                        debug_print(f"LLM call failed: {e}")
+                        debug_print(f"Exception type: {type(e)}")
+                        debug_print("=== End LLM Call (Reporting Analyst - Failed) ===")
+                        raise
+                
+                llm.call = debug_call
+                
         except Exception as e:
             debug_print(f"ERROR creating LLM: {e}")
             llm = None
