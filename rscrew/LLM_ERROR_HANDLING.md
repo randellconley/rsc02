@@ -1,8 +1,8 @@
-# RSCrew LLM Error Handling System
+# RSCrew Hybrid LLM Error Handling System
 
 ## 🎯 Overview
 
-The RSCrew LLM Error Handling System provides robust error recovery and retry mechanisms to prevent the common "Invalid response from LLM call - None or empty" errors that can occur due to:
+The RSCrew Hybrid LLM Error Handling System combines **Tenacity's robust retry logic** with **RSCrew's context-aware fallbacks** to prevent the common "Invalid response from LLM call - None or empty" errors that can occur due to:
 
 - **API rate limiting**
 - **Network connectivity issues** 
@@ -10,32 +10,39 @@ The RSCrew LLM Error Handling System provides robust error recovery and retry me
 - **Token limit exceeded**
 - **Invalid API configurations**
 
-## ✨ Features
+## ✨ Hybrid Features
 
-- ✅ **Automatic Retry Logic**: Exponential backoff with configurable attempts
-- ✅ **Intelligent Fallback Responses**: Context-aware fallback when LLM fails
-- ✅ **Error Classification**: Distinguishes recoverable vs permanent errors
+### 🔄 **Tenacity Retry Logic**
+- ✅ **Battle-tested Reliability**: Production-grade retry mechanisms
+- ✅ **Advanced Retry Strategies**: Exponential backoff with jitter
+- ✅ **Sophisticated Error Classification**: Recoverable vs permanent errors
+- ✅ **Async Support**: Built-in async/await compatibility
+- ✅ **Retry Statistics**: Built-in metrics and callbacks
+
+### 🎯 **RSCrew Context-Aware Fallbacks**
+- ✅ **Intelligent Fallback Responses**: Context-aware responses when retries fail
+- ✅ **Code-specific Fallbacks**: Helpful code templates for programming requests
+- ✅ **Research Fallbacks**: Guidance for research and analysis requests
 - ✅ **Zero Configuration**: Works out of the box with sensible defaults
-- ✅ **Configurable Settings**: Environment variables for fine-tuning
 - ✅ **Debug Logging**: Detailed logging for troubleshooting
 - ✅ **Transparent Integration**: No changes needed to existing code
 
 ## 🚀 How It Works
 
 ### 1. Automatic Integration
-The error handling is automatically applied to all agents when the crew is created:
+The hybrid error handling is automatically applied to all agents when the crew is created:
 
 ```python
 # In crew.py - happens automatically
-robust_agents = apply_error_handling_to_agents(self.agents)
+robust_agents = apply_tenacity_error_handling_to_agents(self.agents)
 ```
 
-### 2. Retry Mechanism
+### 2. Hybrid Retry Mechanism
 When an LLM call fails:
-1. **Classify Error**: Determine if error is recoverable
-2. **Exponential Backoff**: Wait with increasing delays (1s, 2s, 4s, etc.)
-3. **Retry Attempt**: Make another LLM call
-4. **Fallback Response**: If all retries fail, provide contextual fallback
+1. **Tenacity Classification**: Determine if error is recoverable using Tenacity's logic
+2. **Tenacity Retry**: Use exponential backoff with jitter (1s, 2s, 4s, etc.)
+3. **Multiple Attempts**: Tenacity handles sophisticated retry strategies
+4. **RSCrew Fallback**: If all retries fail, provide context-aware fallback response
 
 ### 3. Fallback Responses
 Context-aware fallback responses based on the request type:
@@ -208,24 +215,29 @@ The LLM error handling is automatically integrated into:
 ## 📝 Implementation Details
 
 ### Files Added
-- `src/rscrew/llm_error_handler.py`: Core error handling system
+- `src/rscrew/tenacity_llm_handler.py`: Hybrid Tenacity + RSCrew error handling system
+- `src/rscrew/llm_error_handler.py`: Original custom error handling (fallback)
 - `llm_config.env`: Configuration template
 - `LLM_ERROR_HANDLING.md`: This documentation
+- `TENACITY_COMPARISON.md`: Comparison between approaches
 
 ### Files Modified
-- `src/rscrew/crew.py`: Integrated error handling into crew creation
+- `src/rscrew/crew.py`: Integrated hybrid error handling into crew creation
 
 ### Dependencies
-- No additional dependencies required
-- Uses standard Python libraries: `time`, `logging`, `functools`
+- **Tenacity**: Advanced retry library (already installed in RSCrew)
+- **Standard Python libraries**: `time`, `logging`, `functools`
+- **Fallback**: Custom error handler if Tenacity unavailable
 
-## 🎯 Benefits
+## 🎯 Hybrid Benefits
 
-1. **Reliability**: Dramatically reduces LLM-related failures
-2. **User Experience**: Provides helpful fallback responses instead of crashes
-3. **Debugging**: Clear logging helps identify and resolve issues
-4. **Flexibility**: Configurable for different use cases and environments
-5. **Transparency**: Works behind the scenes without changing user workflows
+1. **Best-in-Class Reliability**: Tenacity's battle-tested retry logic + RSCrew's intelligent fallbacks
+2. **Superior User Experience**: Meaningful responses instead of crashes or generic errors
+3. **Production-Ready**: Tenacity's robustness with RSCrew's domain-specific intelligence
+4. **Advanced Debugging**: Tenacity's detailed retry logs + RSCrew's context-aware logging
+5. **Future-Proof**: Tenacity's active development + RSCrew's specialized LLM handling
+6. **Zero Configuration**: Works out of the box with intelligent defaults
+7. **Graceful Degradation**: Always provides useful responses, even during outages
 
 ---
 

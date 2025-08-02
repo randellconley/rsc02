@@ -13,11 +13,11 @@ from rscrew.tools.programming_tools import (
     DevelopmentTools, QualityAssuranceTools, DocumentationTools
 )
 from rscrew.interactive_dialogue import conduct_operator_dialogue
-from rscrew.llm_error_handler import apply_error_handling_to_agents, get_llm_config
+from rscrew.tenacity_llm_handler import apply_tenacity_error_handling_to_agents, check_tenacity_installation
 
 # Version information for deployment tracking
-RSCREW_VERSION = "v3.0-programming-assistant"
-RSCREW_FEATURES = ["null-response-handling", "debug-monitoring", "programming-assistant-crew"]
+RSCREW_VERSION = "v3.1-tenacity-hybrid"
+RSCREW_FEATURES = ["tenacity-retry-logic", "context-aware-fallbacks", "debug-monitoring", "programming-assistant-crew"]
 RSCREW_COMMIT = "programming-assistant"  # Full programming assistant crew implementation
 
 # Debug toggle - only enabled when explicitly set to 'true'
@@ -434,12 +434,12 @@ class Rscrew():
         for i, agent in enumerate(self.agents):
             debug_print(f"Agent {i}: {getattr(agent, 'role', 'unknown')} with LLM: {getattr(agent, 'llm', 'None')}")
         
-        # Apply LLM error handling to all agents
-        debug_print("Applying LLM error handling to agents...")
-        llm_config = get_llm_config()
-        debug_print(f"LLM config: max_retries={llm_config['max_retries']}, fallback_enabled={llm_config['fallback_enabled']}")
+        # Apply Tenacity-based LLM error handling to all agents
+        debug_print("Applying Tenacity-based LLM error handling to agents...")
+        tenacity_available = check_tenacity_installation()
+        debug_print(f"Tenacity available: {tenacity_available}")
         
-        robust_agents = apply_error_handling_to_agents(self.agents)
+        robust_agents = apply_tenacity_error_handling_to_agents(self.agents)
         
         crew = Crew(
             agents=robust_agents, # Agents with error handling applied
@@ -449,6 +449,6 @@ class Rscrew():
             # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
         
-        debug_print("Crew created successfully with LLM error handling")
+        debug_print("Crew created successfully with Tenacity-based LLM error handling")
         debug_print("====================")
         return crew
