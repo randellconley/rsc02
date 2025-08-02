@@ -13,6 +13,7 @@ from rscrew.tools.programming_tools import (
     DevelopmentTools, QualityAssuranceTools, DocumentationTools
 )
 from rscrew.interactive_dialogue import conduct_operator_dialogue
+from rscrew.llm_error_handler import apply_error_handling_to_agents, get_llm_config
 
 # Version information for deployment tracking
 RSCREW_VERSION = "v3.0-programming-assistant"
@@ -433,14 +434,21 @@ class Rscrew():
         for i, agent in enumerate(self.agents):
             debug_print(f"Agent {i}: {getattr(agent, 'role', 'unknown')} with LLM: {getattr(agent, 'llm', 'None')}")
         
+        # Apply LLM error handling to all agents
+        debug_print("Applying LLM error handling to agents...")
+        llm_config = get_llm_config()
+        debug_print(f"LLM config: max_retries={llm_config['max_retries']}, fallback_enabled={llm_config['fallback_enabled']}")
+        
+        robust_agents = apply_error_handling_to_agents(self.agents)
+        
         crew = Crew(
-            agents=self.agents, # Automatically created by the @agent decorator
+            agents=robust_agents, # Agents with error handling applied
             tasks=self.tasks, # Automatically created by the @task decorator
             process=Process.sequential,
             verbose=True,
             # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
         
-        debug_print("Crew created successfully")
+        debug_print("Crew created successfully with LLM error handling")
         debug_print("====================")
         return crew
