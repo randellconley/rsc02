@@ -16,14 +16,92 @@ from pathlib import Path
 class OutputCapture:
     """Handles automatic capture and storage of console output"""
     
-    def __init__(self, output_dir: str = "output", max_files: int = 200):
-        self.output_dir = Path(output_dir)
+    def __init__(self, output_dir: Optional[str] = None, max_files: int = 200):
+        if output_dir is None:
+            # Auto-detect project root and use its output directory
+            project_root = self.find_project_root()
+            if project_root:
+                self.output_dir = project_root / "output"
+                self.output_source = "project"
+            else:
+                # Fallback to user's home directory
+                self.output_dir = Path.home() / ".rscrew" / "output"
+                self.output_source = "fallback"
+        else:
+            self.output_dir = Path(output_dir)
+            self.output_source = "custom"
+        
         self.max_files = max_files
         self.ensure_output_dir()
     
+    def find_project_root(self) -> Optional[Path]:
+        """Find RSCrew project root by looking for pyproject.toml with rscrew content"""
+        # Start from the module's location
+        current_path = Path(__file__).parent
+        
+        # Walk up the directory tree looking for pyproject.toml
+        for parent in [current_path] + list(current_path.parents):
+            pyproject_path = parent / "pyproject.toml"
+            if pyproject_path.exists():
+                try:
+                    with open(pyproject_path, 'r', encoding='utf-8') as f:
+                        content = f.read().lower()
+                        # Check if this is the RSCrew project
+                        if 'rscrew' in content and ('name' in content or 'project' in content):
+                            return parent
+                except Exception:
+                    continue
+        
+        # Also check common RSCrew installation paths
+        common_paths = [
+            Path("/home/ubuntu/environment/rsc02/rscrew"),
+            Path("/home/ubuntu/environment/workbench/rsc02/rscrew"),
+        ]
+        
+        for path in common_paths:
+            if path.exists() and (path / "pyproject.toml").exists():
+                try:
+                    with open(path / "pyproject.toml", 'r', encoding='utf-8') as f:
+                        content = f.read().lower()
+                        if 'rscrew' in content:
+                            return path
+                except Exception:
+                    continue
+        
+        return None
+    
     def ensure_output_dir(self):
-        """Ensure output directory exists"""
-        self.output_dir.mkdir(exist_ok=True)
+        """Ensure output directory exists with proper error handling"""
+        try:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Provide feedback about where outputs will be saved
+            if self.output_source == "project":
+                print(f"[OUTPUT] Using project output directory: {self.output_dir}")
+            elif self.output_source == "fallback":
+                print(f"[OUTPUT] Using fallback output directory: {self.output_dir}")
+            elif self.output_source == "custom":
+                print(f"[OUTPUT] Using custom output directory: {self.output_dir}")
+                
+        except PermissionError as e:
+            print(f"[OUTPUT] ERROR: Permission denied creating output directory: {self.output_dir}")
+            print(f"[OUTPUT] Error details: {e}")
+            
+            # Try fallback to temp directory
+            import tempfile
+            temp_dir = Path(tempfile.gettempdir()) / "rscrew_output"
+            try:
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                self.output_dir = temp_dir
+                self.output_source = "temp"
+                print(f"[OUTPUT] Using temporary directory as fallback: {self.output_dir}")
+            except Exception as temp_error:
+                print(f"[OUTPUT] CRITICAL: Cannot create any output directory: {temp_error}")
+                raise
+                
+        except Exception as e:
+            print(f"[OUTPUT] ERROR: Failed to create output directory: {e}")
+            raise
     
     def generate_context_summary(self, prompt: str, max_length: int = 40) -> str:
         """Generate a contextual summary for filename from user prompt"""
@@ -149,10 +227,11 @@ Working Directory: {working_dir or os.getcwd()}
             self.cleanup_old_files()
             
             print(f"[OUTPUT] Saved to: {filename}")
+            print(f"[OUTPUT] Full path: {filepath}")
             return str(filepath)
             
         except Exception as e:
-            print(f"[OUTPUT] Error saving output: {e}")
+            print(f"[OUTPUT] Error saving output to {filepath}: {e}")
             return ""
     
     def get_recent_files(self, limit: int = 10) -> List[str]:
@@ -167,13 +246,21 @@ Working Directory: {working_dir or os.getcwd()}
         return [os.path.basename(f) for f, _ in files_with_time[:limit]]
 
 
-# Global instance for easy access
-output_capture = OutputCapture()
+# Global instance for easy access (lazy initialization)
+_output_capture_instance = None
+
+
+def get_output_capture() -> OutputCapture:
+    """Get or create the global output capture instance"""
+    global _output_capture_instance
+    if _output_capture_instance is None:
+        _output_capture_instance = OutputCapture()
+    return _output_capture_instance
 
 
 def capture_output(prompt: str, output: str, working_dir: str = "", command: str = "") -> str:
     """Convenience function to capture output"""
-    return output_capture.save_output(prompt, output, working_dir, command)
+    return get_output_capture().save_output(prompt, output, working_dir, command)
 
 
 if __name__ == "__main__":
@@ -181,20 +268,36 @@ if __name__ == "__main__":
     test_prompt = "for some reason test index file is not appear for test.randellconley.com"
     test_output = "This is a test output from the RC command execution..."
     
+    # Test the new auto-detection functionality
+    print("=== Testing OutputCapture Auto-Detection ===")
     capture = OutputCapture()
+    print(f"Output directory: {capture.output_dir}")
+    print(f"Output source: {capture.output_source}")
+    
     filepath = capture.save_output(test_prompt, test_output, "/home/ubuntu/test", "rc test command")
     print(f"Test output saved to: {filepath}")
     
     # Test filename generation
     test_prompts = [
         "Create a REST API for user management",
-        "Fix Apache configuration for SSL",
+        "Fix Apache configuration for SSL", 
         "Debug database connection issues",
         "Implement authentication system with JWT tokens"
     ]
     
+    print("\n=== Testing Filename Generation ===")
     for prompt in test_prompts:
         filename = capture.generate_filename(prompt)
         print(f"Prompt: {prompt[:50]}...")
         print(f"Filename: {filename}")
         print()
+    
+    # Test project root detection
+    print("=== Testing Project Root Detection ===")
+    project_root = capture.find_project_root()
+    print(f"Detected project root: {project_root}")
+    
+    # Test convenience function
+    print("\n=== Testing Convenience Function ===")
+    test_filepath = capture_output("Test convenience function", "Test output content")
+    print(f"Convenience function result: {test_filepath}")
