@@ -1,0 +1,114 @@
+# RSCrew Command Cheatsheet
+
+## Flag-Based Planning System Commands
+
+### Generate Implementation Plans
+rc -plan "Your project description"
+rc -plan "Build a web app" -name my_app
+rc -plan "Create a REST API for user management"
+rc -plan "Build a task tracker" -name task_manager
+
+### Implement from Plans
+rc -build /path/to/plan.md
+rc -build ./plans/task_manager.md
+rc -build ./plans/my_app.md
+
+### Interactive Plan Updates
+rc -update /path/to/plan.md
+rc -update ./plans/task_manager.md
+rc -update ./plans/my_app.md
+
+## Legacy Mode Commands
+
+### Direct Prompt Execution
+rc Your prompt here
+rc Please analyze this project
+rc Help me debug this code
+
+### File-Based Prompts
+rc -f /path/to/prompt.txt
+rc --file ./prompts/analysis_request.txt
+
+## Debug Mode Commands
+
+### Enable Debug Output
+RSCREW_DEBUG=true rc -plan "Your project"
+RSCREW_DEBUG=true rc -build ./plans/project.md
+RSCREW_DEBUG=true rc Your prompt here
+
+### Enhanced Debug with Retry Configuration
+RSCREW_DEBUG=true RSCREW_LLM_MAX_RETRIES=5 rc -plan "Your project"
+RSCREW_DEBUG=true RSCREW_LLM_FALLBACK=true rc -build ./plans/project.md
+
+## Environment Variables
+
+### Debug Settings
+export RSCREW_DEBUG=true                    # Enable debug logging (default: true)
+
+### LLM Configuration
+export RSCREW_LLM_MAX_RETRIES=5            # Maximum retry attempts (default: 3)
+export RSCREW_LLM_FALLBACK=true            # Enable fallback responses (default: true)
+export RSCREW_LLM_BASE_DELAY=2.0           # Base delay for retries (default: 1.0)
+export RSCREW_LLM_MAX_DELAY=120.0          # Maximum delay for retries (default: 60.0)
+
+## Common Usage Patterns
+
+### Quick Project Planning
+rc -plan "Build a todo app with React and Node.js" -name todo_app
+
+### Plan and Build Workflow
+rc -plan "Create a blog system" -name blog
+rc -build ./plans/blog.md
+
+### Interactive Development
+rc -plan "Build an API" -name api
+rc -update ./plans/api.md
+# (Make changes in interactive session)
+rc -build ./plans/api.md
+
+### Troubleshooting with Debug
+RSCREW_DEBUG=true rc -plan "Debug this issue"
+RSCREW_DEBUG=true RSCREW_LLM_MAX_RETRIES=5 rc Your debugging request
+
+## File Locations
+
+### Plans Directory
+./plans/                                   # Auto-created for plan files
+./plans/project_name.md                    # Generated plan files
+
+### Output Directory
+./output/                                  # Execution logs and outputs
+./output/debug_run_TIMESTAMP.txt           # Debug output files
+
+## Help Commands
+
+rc --help                                  # Show all available options
+rc -h                                      # Short help
+
+## Examples by Use Case
+
+### Web Development
+rc -plan "Build a React dashboard with authentication" -name dashboard
+rc -plan "Create a REST API with Express and MongoDB" -name api
+
+### Data Analysis
+rc -plan "Build a data pipeline for CSV processing" -name pipeline
+rc -plan "Create a machine learning model for classification" -name ml_model
+
+### DevOps
+rc -plan "Set up CI/CD pipeline with GitHub Actions" -name cicd
+rc -plan "Create Docker containerization for Node.js app" -name docker
+
+### Debugging
+rc "Analyze why my React app won't start"
+rc "Help troubleshoot database connection issues"
+rc "Debug Python import errors"
+
+## Tips
+
+1. Always use descriptive names with -name flag for better organization
+2. Plans are saved in ./plans/ directory with .md extension
+3. Use -update for iterative refinement of plans
+4. Enable debug mode when troubleshooting issues
+5. Legacy mode works for quick one-off requests
+6. File-based prompts useful for complex or repeated requests
