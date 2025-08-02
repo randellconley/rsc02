@@ -9,6 +9,11 @@ from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
 )
 
+# Version information for deployment tracking
+RSCREW_VERSION = "v2.1-retry-enhanced"
+RSCREW_FEATURES = ["retry-logic", "context-monitoring", "graceful-fallback"]
+RSCREW_COMMIT = "08b4467"  # Enhanced LLM wrapper commit
+
 # Debug toggle - set to False to disable debug output
 DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
 
@@ -24,6 +29,11 @@ if DEBUG_MODE:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     debug_print("Debug mode enabled")
+    debug_print(f"=== RSCrew Version Info ===")
+    debug_print(f"Version: {RSCREW_VERSION}")
+    debug_print(f"Features: {', '.join(RSCREW_FEATURES)}")
+    debug_print(f"Commit: {RSCREW_COMMIT}")
+    debug_print("=============================")
 
 # Debug: Check environment variables
 debug_print("=== Environment Check ===")
@@ -71,7 +81,8 @@ class Rscrew():
                 original_call = llm.call
                 def fixed_call(*args, **kwargs):
                     if DEBUG_MODE:
-                        debug_print(f"=== CrewAI LLM Call Intercepted ===")
+                        debug_print(f"=== CrewAI LLM Call Intercepted ({RSCREW_VERSION}) ===")
+                        debug_print(f"Enhanced Features Active: {', '.join(RSCREW_FEATURES)}")
                         debug_print(f"Args count: {len(args)}")
                         debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
                         if args:
@@ -118,7 +129,7 @@ class Rscrew():
                             
                             # Handle empty/invalid response
                             if DEBUG_MODE:
-                                debug_print(f"WARNING: LLM returned empty response on attempt {attempt + 1}/{max_retries}")
+                                debug_print(f"WARNING ({RSCREW_VERSION}): LLM returned empty response on attempt {attempt + 1}/{max_retries}")
                                 debug_print(f"Result type: {type(result)}, Result: '{result}'")
                                 if prompt_length > 30000:
                                     debug_print(f"Large prompt may be causing issues ({prompt_length} chars)")
@@ -130,7 +141,7 @@ class Rscrew():
                         
                         # All retries failed, return a minimal valid response
                         if DEBUG_MODE:
-                            debug_print("WARNING: All retry attempts failed, returning minimal response")
+                            debug_print(f"WARNING ({RSCREW_VERSION}): All retry attempts failed, using graceful fallback")
                         return "I apologize, but I'm experiencing technical difficulties. Please try again."
                     except Exception as e:
                         if DEBUG_MODE:
