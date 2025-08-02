@@ -7,6 +7,12 @@ from typing import List
 from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
 )
+
+# Debug: Check environment variables
+print("=== DEBUG: Environment Check ===")
+print(f"ANTHROPIC_API_KEY exists: {bool(os.getenv('ANTHROPIC_API_KEY'))}")
+print(f"ANTHROPIC_API_KEY length: {len(os.getenv('ANTHROPIC_API_KEY', ''))}")
+print("=================================")
 # If you want to run a snippet of code before or after the crew starts,
 # you can use the @before_kickoff and @after_kickoff decorators
 # https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
@@ -26,8 +32,21 @@ class Rscrew():
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
     def researcher(self) -> Agent:
-        llm = LLM(model="claude-3-5-sonnet-20241022", api_key=os.getenv("ANTHROPIC_API_KEY"))
-        print(f"Researcher LLM: {llm.model}")
+        print("=== DEBUG: Creating Researcher Agent ===")
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        print(f"API Key available: {bool(api_key)}")
+        print(f"API Key length: {len(api_key) if api_key else 0}")
+        
+        try:
+            llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
+            print(f"LLM created successfully: {llm.model}")
+        except Exception as e:
+            print(f"ERROR creating LLM: {e}")
+            llm = None
+        
+        print(f"Researcher LLM: {llm.model if llm else 'None'}")
+        print("======================================")
+        
         return Agent(
             config=self.agents_config['researcher'], # type: ignore[index]
             tools=[ReadFile(), ListDirectory(), FindFiles(), GetFileInfo()],
@@ -37,8 +56,21 @@ class Rscrew():
 
     @agent
     def reporting_analyst(self) -> Agent:
-        llm = LLM(model="claude-3-5-sonnet-20241022", api_key=os.getenv("ANTHROPIC_API_KEY"))
-        print(f"Reporting Analyst LLM: {llm.model}")
+        print("=== DEBUG: Creating Reporting Analyst Agent ===")
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        print(f"API Key available: {bool(api_key)}")
+        print(f"API Key length: {len(api_key) if api_key else 0}")
+        
+        try:
+            llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
+            print(f"LLM created successfully: {llm.model}")
+        except Exception as e:
+            print(f"ERROR creating LLM: {e}")
+            llm = None
+        
+        print(f"Reporting Analyst LLM: {llm.model if llm else 'None'}")
+        print("==========================================")
+        
         return Agent(
             config=self.agents_config['reporting_analyst'], # type: ignore[index]
             tools=[ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo()],
