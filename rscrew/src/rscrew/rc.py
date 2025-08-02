@@ -48,6 +48,13 @@ EXECUTION CONTEXT:
 
 def run_crew_with_prompt(user_prompt):
     """Run the crew with a custom prompt."""
+    # Check if debug mode is enabled
+    debug_mode = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
+    
+    def debug_print(message):
+        if debug_mode:
+            print(f"[DEBUG] {message}")
+    
     execution_context = get_execution_context()
     
     # Combine user prompt with execution context
@@ -60,20 +67,43 @@ def run_crew_with_prompt(user_prompt):
         'full_prompt': full_prompt
     }
     
+    debug_print(f"=== RC Inputs Debug ===")
+    debug_print(f"Inputs keys: {list(inputs.keys())}")
+    debug_print(f"Topic: {inputs['topic']}")
+    debug_print(f"Current year: {inputs['current_year']}")
+    debug_print(f"Execution context length: {len(inputs['execution_context'])}")
+    debug_print(f"Full prompt length: {len(inputs['full_prompt'])}")
+    debug_print("======================")
+    
     try:
         print("🚀 Starting RSCrew with custom prompt...")
         print(f"📍 Working from: {os.getcwd()}")
         print(f"💭 Prompt: {user_prompt}")
         print("-" * 50)
         
-        result = Rscrew().crew().kickoff(inputs=inputs)
+        debug_print("Creating Rscrew instance...")
+        crew_instance = Rscrew()
+        debug_print("Rscrew instance created")
+        
+        debug_print("Getting crew...")
+        crew = crew_instance.crew()
+        debug_print("Crew obtained")
+        
+        debug_print("Starting kickoff...")
+        result = crew.kickoff(inputs=inputs)
+        debug_print("Kickoff completed")
         
         print("-" * 50)
         print("✅ RSCrew completed!")
         return result
         
     except Exception as e:
+        debug_print(f"Exception type: {type(e).__name__}")
+        debug_print(f"Exception args: {e.args}")
         print(f"❌ Error occurred while running the crew: {e}")
+        if debug_mode:
+            import traceback
+            traceback.print_exc()
         sys.exit(1)
 
 def run():

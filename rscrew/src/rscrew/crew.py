@@ -33,9 +33,19 @@ debug_print("==========================")
 @CrewBase
 class Rscrew():
     """Rscrew crew"""
-
+    
     agents: List[BaseAgent]
     tasks: List[Task]
+    
+    def __init__(self):
+        debug_print("=== Initializing Rscrew Class ===")
+        try:
+            super().__init__()
+            debug_print("Rscrew class initialized successfully")
+        except Exception as e:
+            debug_print(f"Error initializing Rscrew class: {e}")
+            raise
+        debug_print("===================================")
 
     # Learn more about YAML configuration files here:
     # Agents: https://docs.crewai.com/concepts/agents#yaml-configuration-recommended
