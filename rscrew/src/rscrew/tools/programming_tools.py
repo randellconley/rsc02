@@ -15,6 +15,99 @@ class ProjectManagementTools:
     
     @tool
     @staticmethod
+    def classify_user_intent(user_request: str, execution_context: str) -> str:
+        """
+        Classify user intent to determine appropriate workflow routing.
+        
+        Args:
+            user_request (str): The user's original request
+            execution_context (str): Context about where the command was executed
+            
+        Returns:
+            str: Intent classification with confidence and routing recommendation
+        """
+        request_lower = user_request.lower()
+        
+        # Information request indicators
+        info_keywords = [
+            'what is', 'how does', 'explain', 'what are the differences', 'compare',
+            'why should i', 'pros and cons', 'advantages', 'disadvantages', 'benefits',
+            'what are', 'how do', 'tell me about', 'describe', 'definition of'
+        ]
+        
+        # Planning request indicators  
+        planning_keywords = [
+            'what\'s the best approach', 'how should i', 'what would you recommend',
+            'what technologies should', 'help me plan', 'what strategy', 'best practices',
+            'how to structure', 'what framework', 'which tool', 'advice for'
+        ]
+        
+        # Implementation request indicators
+        implementation_keywords = [
+            'build me', 'create a', 'implement', 'develop', 'write code',
+            'generate', 'make a', 'build a', 'create an', 'develop a',
+            'write a', 'code for', 'program that', 'application that'
+        ]
+        
+        # Count matches
+        info_matches = sum(1 for keyword in info_keywords if keyword in request_lower)
+        planning_matches = sum(1 for keyword in planning_keywords if keyword in request_lower)
+        implementation_matches = sum(1 for keyword in implementation_keywords if keyword in request_lower)
+        
+        # Determine intent
+        if info_matches > planning_matches and info_matches > implementation_matches:
+            intent = "INFORMATION"
+            confidence = "High" if info_matches >= 2 else "Medium"
+            workflow = "Quick Response"
+            reasoning = f"Request contains {info_matches} information-seeking keywords"
+        elif planning_matches > implementation_matches:
+            intent = "PLANNING"
+            confidence = "High" if planning_matches >= 2 else "Medium"
+            workflow = "Strategic Planning"
+            reasoning = f"Request contains {planning_matches} planning/strategy keywords"
+        elif implementation_matches > 0:
+            intent = "IMPLEMENTATION"
+            confidence = "High" if implementation_matches >= 2 else "Medium"
+            workflow = "Full Development"
+            reasoning = f"Request contains {implementation_matches} implementation keywords"
+        else:
+            # Default classification based on request structure
+            if '?' in user_request:
+                intent = "INFORMATION"
+                confidence = "Medium"
+                workflow = "Quick Response"
+                reasoning = "Request is phrased as a question"
+            else:
+                intent = "PLANNING"
+                confidence = "Low"
+                workflow = "Strategic Planning"
+                reasoning = "Unclear intent, defaulting to planning workflow"
+        
+        classification = f"""
+INTENT CLASSIFICATION RESULT
+============================
+
+USER REQUEST: {user_request}
+EXECUTION CONTEXT: {execution_context}
+
+INTENT: {intent}
+CONFIDENCE: {confidence}
+REASONING: {reasoning}
+
+RECOMMENDED WORKFLOW: {workflow}
+
+WORKFLOW DETAILS:
+- INFORMATION → Research Analyst + Technical Writer (2 phases)
+- PLANNING → Project Orchestrator + Research Analyst + Solution Architect (3 phases)  
+- IMPLEMENTATION → Full 6-agent development workflow (6 phases)
+
+ROUTING DECISION: Proceed with {workflow} workflow
+        """
+        
+        return classification.strip()
+    
+    @tool
+    @staticmethod
     def analyze_project_scope(user_request: str, execution_context: str) -> str:
         """
         Analyze user request and execution context to define project scope.

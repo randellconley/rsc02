@@ -144,6 +144,7 @@ class Rscrew():
             config=self.agents_config['project_orchestrator'], # type: ignore[index]
             tools=[
                 ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ProjectManagementTools.classify_user_intent,
                 ProjectManagementTools.analyze_project_scope,
                 ProjectManagementTools.create_task_breakdown
             ],
@@ -258,6 +259,40 @@ class Rscrew():
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
+    @task
+    def intent_classification_task(self) -> Task:
+        debug_print("=== Creating Intent Classification Task ===")
+        task = Task(
+            config=self.tasks_config['intent_classification_task'], # type: ignore[index]
+            agent=self.project_orchestrator()
+        )
+        debug_print(f"Intent Classification task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("===========================================")
+        return task
+
+    @task
+    def research_task(self) -> Task:
+        debug_print("=== Creating Research Task (Information Mode) ===")
+        task = Task(
+            config=self.tasks_config['research_task'], # type: ignore[index]
+            agent=self.research_analyst()
+        )
+        debug_print(f"Research task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("=================================================")
+        return task
+
+    @task
+    def information_response_task(self) -> Task:
+        debug_print("=== Creating Information Response Task ===")
+        task = Task(
+            config=self.tasks_config['information_response_task'], # type: ignore[index]
+            agent=self.technical_writer(),
+            output_file='information_response.md'
+        )
+        debug_print(f"Information Response task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("==========================================")
+        return task
+
     @task
     def project_analysis_task(self) -> Task:
         debug_print("=== Creating Project Analysis Task ===")

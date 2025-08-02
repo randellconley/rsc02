@@ -1,3 +1,45 @@
+intent_classification_task:
+  description: >
+    As the Project Orchestrator, analyze the user's request to determine their intent and route to the appropriate workflow:
+    
+    User Request: {topic}
+    Execution Context: {execution_context}
+    Current Year: {current_year}
+    
+    Classify the request into one of these categories:
+    
+    1. INFORMATION REQUEST - User wants to learn, understand, or get explanations about:
+       - "What is...", "How does... work", "Explain...", "What are the differences between..."
+       - "Why should I use...", "What are the pros/cons of..."
+       - Questions seeking knowledge, comparisons, or explanations
+       
+    2. PLANNING REQUEST - User wants strategic advice, recommendations, or planning:
+       - "What's the best approach for...", "How should I structure..."
+       - "What technologies should I use for...", "What would you recommend for..."
+       - "Help me plan...", "What strategy should I use..."
+       
+    3. IMPLEMENTATION REQUEST - User wants something built, created, or implemented:
+       - "Build me...", "Create a...", "Implement...", "Develop..."
+       - "Write code for...", "Generate...", "Make a..."
+       - Clear requests for deliverable outputs
+    
+    Based on your classification, recommend the appropriate workflow:
+    - INFORMATION: Quick response workflow (Research + Documentation)
+    - PLANNING: Strategic planning workflow (Analysis + Research + Architecture)  
+    - IMPLEMENTATION: Full development workflow (All 6 phases)
+  expected_output: >
+    Intent classification with recommended workflow:
+    
+    INTENT: [INFORMATION/PLANNING/IMPLEMENTATION]
+    CONFIDENCE: [High/Medium/Low]
+    REASONING: Brief explanation of why this classification was chosen
+    RECOMMENDED_WORKFLOW: [Quick Response/Strategic Planning/Full Development]
+    
+    If INFORMATION: Proceed with research_task and documentation_task only
+    If PLANNING: Proceed with project_analysis_task, technical_research_task, and solution_design_task
+    If IMPLEMENTATION: Proceed with full 6-phase workflow
+  agent: project_orchestrator
+
 project_analysis_task:
   description: >
     As the Project Orchestrator, analyze the user's request and define the project scope:
@@ -147,6 +189,60 @@ quality_assurance_task:
     Format as a detailed QA report with clear pass/fail criteria.
   agent: quality_assurance
 
+# Quick Response Tasks (for INFORMATION requests)
+research_task:
+  description: >
+    As the Technical Research Specialist, provide comprehensive information and analysis:
+    
+    User Request: {topic}
+    Execution Context: {execution_context}
+    Current Year: {current_year}
+    
+    The user is seeking information, explanations, or understanding. Provide:
+    1. Clear, accurate explanations of concepts or technologies
+    2. Comparisons and trade-offs when relevant
+    3. Current best practices and industry standards
+    4. Practical examples and use cases
+    5. Relevant context and background information
+    6. Actionable insights and recommendations
+    
+    Focus on being informative, educational, and directly addressing what the user wants to know.
+  expected_output: >
+    Comprehensive informational response including:
+    - Direct answers to the user's questions
+    - Clear explanations with examples
+    - Relevant comparisons and context
+    - Current best practices and standards
+    - Practical insights and recommendations
+    Format as clear, well-organized information that educates and informs.
+  agent: research_analyst
+
+information_response_task:
+  description: >
+    As the Technical Documentation Specialist, create a polished informational response:
+    
+    Research Findings: Use the research analyst's comprehensive analysis
+    User Request: {topic}
+    
+    Create a final response that:
+    1. Directly answers the user's question in clear language
+    2. Organizes information in a logical, easy-to-follow structure
+    3. Includes practical examples and actionable insights
+    4. Provides additional resources or next steps if helpful
+    5. Uses appropriate formatting for readability
+    
+    This is an informational response, not implementation documentation.
+  expected_output: >
+    A clear, well-structured informational response that:
+    - Directly addresses the user's question
+    - Provides comprehensive yet concise information
+    - Includes practical examples and insights
+    - Is formatted for easy reading and understanding
+    - Offers actionable next steps where appropriate
+    Format as clear markdown without code block markers.
+  agent: technical_writer
+
+# Full Development Tasks (for IMPLEMENTATION requests)
 documentation_task:
   description: >
     As the Technical Documentation Specialist, create comprehensive documentation:
