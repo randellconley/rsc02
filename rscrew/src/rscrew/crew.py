@@ -65,6 +65,33 @@ class Rscrew():
         try:
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
             debug_print(f"LLM created: {llm.model}")
+            
+            # Add debugging wrapper to intercept CrewAI's LLM calls
+            if DEBUG_MODE:
+                original_call = llm.call
+                def debug_call(*args, **kwargs):
+                    debug_print(f"=== CrewAI LLM Call Intercepted ===")
+                    debug_print(f"Args count: {len(args)}")
+                    debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
+                    if args:
+                        debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
+                        debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
+                    
+                    try:
+                        result = original_call(*args, **kwargs)
+                        debug_print(f"LLM call result type: {type(result)}")
+                        debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
+                        debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
+                        debug_print("=== End LLM Call ===")
+                        return result
+                    except Exception as e:
+                        debug_print(f"LLM call failed: {e}")
+                        debug_print(f"Exception type: {type(e)}")
+                        debug_print("=== End LLM Call (Failed) ===")
+                        raise
+                
+                llm.call = debug_call
+                
         except Exception as e:
             debug_print(f"ERROR creating LLM: {e}")
             llm = None
@@ -72,11 +99,26 @@ class Rscrew():
         # Test LLM directly
         if llm and DEBUG_MODE:
             try:
-                debug_print("Testing LLM...")
+                debug_print("Testing LLM with simple call...")
                 test_response = llm.call("Say 'test successful'")
-                debug_print(f"LLM test response: {test_response}")
+                debug_print(f"Simple test response: {test_response}")
+                debug_print(f"Response type: {type(test_response)}")
+                debug_print(f"Response length: {len(str(test_response)) if test_response else 0}")
+                
+                # Test with a more complex prompt similar to what CrewAI might send
+                debug_print("Testing LLM with complex prompt...")
+                complex_prompt = """You are a Senior Data Researcher. Your goal is to uncover cutting-edge developments in hello.
+                
+Please respond with a brief analysis of the topic 'hello'."""
+                complex_response = llm.call(complex_prompt)
+                debug_print(f"Complex test response: {complex_response}")
+                debug_print(f"Complex response type: {type(complex_response)}")
+                debug_print(f"Complex response length: {len(str(complex_response)) if complex_response else 0}")
+                
             except Exception as e:
                 debug_print(f"LLM test failed: {e}")
+                debug_print(f"Exception type: {type(e)}")
+                debug_print(f"Exception args: {e.args}")
         
         debug_print("===================================")
         
@@ -88,6 +130,8 @@ class Rscrew():
         )
         
         debug_print(f"Agent created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print(f"Agent LLM model: {getattr(agent.llm, 'model', 'Unknown') if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
+        debug_print(f"Agent LLM type: {type(agent.llm) if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
         return agent
 
     @agent
@@ -112,6 +156,8 @@ class Rscrew():
         )
         
         debug_print(f"Agent created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print(f"Agent LLM model: {getattr(agent.llm, 'model', 'Unknown') if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
+        debug_print(f"Agent LLM type: {type(agent.llm) if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
         return agent
 
     # To learn more about structured task outputs,
@@ -124,7 +170,7 @@ class Rscrew():
             config=self.tasks_config['research_task'], # type: ignore[index]
             agent=self.researcher()
         )
-        debug_print(f"Research task created with agent: {getattr(task, 'agent', 'None')}")
+        debug_print(f"Research task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
         debug_print("==============================")
         return task
 
@@ -136,7 +182,7 @@ class Rscrew():
             agent=self.reporting_analyst(),
             output_file='report.md'
         )
-        debug_print(f"Reporting task created with agent: {getattr(task, 'agent', 'None')}")
+        debug_print(f"Reporting task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
         debug_print("===============================")
         return task
 
