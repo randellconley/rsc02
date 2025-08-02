@@ -1,4 +1,5 @@
 import os
+import logging
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
@@ -8,11 +9,23 @@ from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
 )
 
+# Debug toggle - set to False to disable debug output
+DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
+
+def debug_print(message):
+    if DEBUG_MODE:
+        print(f"[DEBUG] {message}")
+
+# Set up logging for CrewAI internals
+if DEBUG_MODE:
+    logging.basicConfig(level=logging.DEBUG)
+    debug_print("Debug mode enabled")
+
 # Debug: Check environment variables
-print("=== DEBUG: Environment Check ===")
-print(f"ANTHROPIC_API_KEY exists: {bool(os.getenv('ANTHROPIC_API_KEY'))}")
-print(f"ANTHROPIC_API_KEY length: {len(os.getenv('ANTHROPIC_API_KEY', ''))}")
-print("=================================")
+debug_print("=== Environment Check ===")
+debug_print(f"ANTHROPIC_API_KEY exists: {bool(os.getenv('ANTHROPIC_API_KEY'))}")
+debug_print(f"ANTHROPIC_API_KEY length: {len(os.getenv('ANTHROPIC_API_KEY', ''))}")
+debug_print("==========================")
 # If you want to run a snippet of code before or after the crew starts,
 # you can use the @before_kickoff and @after_kickoff decorators
 # https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
@@ -32,80 +45,116 @@ class Rscrew():
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
     def researcher(self) -> Agent:
-        print("=== DEBUG: Creating Researcher Agent ===")
+        debug_print("=== Creating Researcher Agent ===")
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        print(f"API Key available: {bool(api_key)}")
-        print(f"API Key length: {len(api_key) if api_key else 0}")
+        debug_print(f"API Key available: {bool(api_key)}")
+        debug_print(f"API Key length: {len(api_key) if api_key else 0}")
         
         try:
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-            print(f"LLM created successfully: {llm.model}")
+            debug_print(f"LLM created successfully: {llm.model}")
+            debug_print(f"LLM provider: {getattr(llm, 'provider', 'unknown')}")
+            debug_print(f"LLM class: {type(llm).__name__}")
         except Exception as e:
-            print(f"ERROR creating LLM: {e}")
+            debug_print(f"ERROR creating LLM: {e}")
             llm = None
         
-        print(f"Researcher LLM: {llm.model if llm else 'None'}")
-        print("======================================")
+        debug_print(f"Researcher LLM: {llm.model if llm else 'None'}")
         
-        return Agent(
+        # Test LLM directly
+        if llm and DEBUG_MODE:
+            try:
+                debug_print("Testing LLM with simple call...")
+                test_response = llm.call("Say 'test successful'")
+                debug_print(f"LLM test response: {test_response}")
+            except Exception as e:
+                debug_print(f"LLM test failed: {e}")
+        
+        debug_print("===================================")
+        
+        agent = Agent(
             config=self.agents_config['researcher'], # type: ignore[index]
             tools=[ReadFile(), ListDirectory(), FindFiles(), GetFileInfo()],
             verbose=True,
             llm=llm
         )
+        
+        debug_print(f"Agent created with LLM: {getattr(agent, 'llm', 'None')}")
+        return agent
 
     @agent
     def reporting_analyst(self) -> Agent:
-        print("=== DEBUG: Creating Reporting Analyst Agent ===")
+        debug_print("=== Creating Reporting Analyst Agent ===")
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        print(f"API Key available: {bool(api_key)}")
-        print(f"API Key length: {len(api_key) if api_key else 0}")
+        debug_print(f"API Key available: {bool(api_key)}")
+        debug_print(f"API Key length: {len(api_key) if api_key else 0}")
         
         try:
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-            print(f"LLM created successfully: {llm.model}")
+            debug_print(f"LLM created successfully: {llm.model}")
+            debug_print(f"LLM provider: {getattr(llm, 'provider', 'unknown')}")
+            debug_print(f"LLM class: {type(llm).__name__}")
         except Exception as e:
-            print(f"ERROR creating LLM: {e}")
+            debug_print(f"ERROR creating LLM: {e}")
             llm = None
         
-        print(f"Reporting Analyst LLM: {llm.model if llm else 'None'}")
-        print("==========================================")
+        debug_print(f"Reporting Analyst LLM: {llm.model if llm else 'None'}")
+        debug_print("========================================")
         
-        return Agent(
+        agent = Agent(
             config=self.agents_config['reporting_analyst'], # type: ignore[index]
             tools=[ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo()],
             verbose=True,
             llm=llm
         )
+        
+        debug_print(f"Agent created with LLM: {getattr(agent, 'llm', 'None')}")
+        return agent
 
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
     @task
     def research_task(self) -> Task:
-        return Task(
+        debug_print("=== Creating Research Task ===")
+        task = Task(
             config=self.tasks_config['research_task'], # type: ignore[index]
             agent=self.researcher()
         )
+        debug_print(f"Research task created with agent: {getattr(task, 'agent', 'None')}")
+        debug_print("==============================")
+        return task
 
     @task
     def reporting_task(self) -> Task:
-        return Task(
+        debug_print("=== Creating Reporting Task ===")
+        task = Task(
             config=self.tasks_config['reporting_task'], # type: ignore[index]
             agent=self.reporting_analyst(),
             output_file='report.md'
         )
+        debug_print(f"Reporting task created with agent: {getattr(task, 'agent', 'None')}")
+        debug_print("===============================")
+        return task
 
     @crew
     def crew(self) -> Crew:
         """Creates the Rscrew crew"""
-        # To learn how to add knowledge sources to your crew, check out the documentation:
-        # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
-
-        return Crew(
+        debug_print("=== Creating Crew ===")
+        debug_print(f"Available agents: {len(self.agents)}")
+        debug_print(f"Available tasks: {len(self.tasks)}")
+        
+        for i, agent in enumerate(self.agents):
+            debug_print(f"Agent {i}: {getattr(agent, 'role', 'unknown')} with LLM: {getattr(agent, 'llm', 'None')}")
+        
+        crew = Crew(
             agents=self.agents, # Automatically created by the @agent decorator
             tasks=self.tasks, # Automatically created by the @task decorator
             process=Process.sequential,
             verbose=True,
             # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
+        
+        debug_print("Crew created successfully")
+        debug_print("====================")
+        return crew
