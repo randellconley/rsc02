@@ -75,7 +75,13 @@ class Rscrew():
                     debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
                     if args:
                         debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
-                        debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
+                        debug_print(f"Prompt type: {type(args[0])}")
+                        if isinstance(args[0], list):
+                            debug_print(f"Prompt is list with {len(args[0])} items")
+                            for i, item in enumerate(args[0][:3]):  # Show first 3 items
+                                debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
+                        else:
+                            debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
                     
                     try:
                         result = original_call(*args, **kwargs)
