@@ -1,3 +1,15 @@
 .env
 __pycache__/
 .DS_Store
+
+# Generated reports and output files
+report.md
+*.report.md
+reports/
+output/
+.prompt/
+
+# Debug and log files
+debug.log
+error.log
+*.log
