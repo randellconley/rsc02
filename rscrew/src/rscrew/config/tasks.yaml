@@ -1,61 +1,17 @@
-operator_intent_dialogue_task:
-  description: >
-    As the Operator Intent Interpreter, conduct a sequential Q&A dialogue to understand the user's context and true intentions:
-    
-    User Request: {topic}
-    Execution Context: {execution_context}
-    Current Year: {current_year}
-    
-    Your role is to understand the OPERATOR (the user making the request) through intelligent questioning:
-    
-    DIALOGUE PROCESS:
-    1. Analyze the user's request to identify key context gaps
-    2. Ask ONE targeted question at a time (CLI-friendly)
-    3. Wait for user response before asking next question
-    4. Adapt subsequent questions based on previous answers
-    5. Limit to 3-5 questions total to avoid overwhelming
-    6. Build comprehensive operator context
-    
-    QUESTION CATEGORIES (choose most relevant):
-    - Technical Context: Current tech stack, experience level, existing systems
-    - Purpose & Scope: Learning vs production, timeline, complexity preference
-    - Requirements: Specific features, constraints, integration needs
-    - Operator Style: Preferred approaches, past experiences, next steps
-    
-    DIALOGUE STYLE:
-    - One question at a time with progress indicator (Question 1/5)
-    - Conversational and natural, not interrogative
-    - Build on previous answers to ask smarter follow-ups
-    - Focus on understanding what they're trying to accomplish
-    - Identify what they're NOT saying but might need
-    
-    After gathering sufficient context, synthesize into operator profile for the team.
-  expected_output: >
-    Sequential Q&A dialogue followed by context synthesis:
-    
-    **Question 1/X**: [First targeted question based on request analysis]
-    
-    [Wait for user response, then continue with adaptive questioning until sufficient context]
-    
-    **OPERATOR CONTEXT SYNTHESIS**:
-    - Technical Background: [User's skills, experience, current stack]
-    - Project Context: [Purpose, scope, timeline, constraints]
-    - Operator Style: [Preferences, complexity level, learning goals]
-    - Unstated Needs: [What they probably need but didn't mention]
-    - Next Steps: [What they'll likely need after this]
-    
-    **ENHANCED REQUEST**: [Original request enriched with operator context]
-    
-    Proceeding to intent classification with full operator context...
-  agent: operator_intent_interpreter
+# NOTE: operator_intent_dialogue_task is now handled by interactive_dialogue.py 
+# before the CrewAI workflow starts. This ensures proper CLI interaction.
 
 intent_classification_task:
   description: >
     As the Project Orchestrator, analyze the ENHANCED user request (with operator context) to determine intent and route to appropriate workflow:
     
-    Enhanced Request: Use the Operator Intent Interpreter's context synthesis
-    Original Request: {topic}
-    Operator Context: Available from previous dialogue
+    Enhanced Request: {topic}
+    Operator Context: {operator_context}
+    Technical Background: {technical_background}
+    Project Context: {project_context}
+    Complexity Preference: {complexity_preference}
+    Q&A Dialogue: {qa_dialogue}
+    Unstated Needs: {unstated_needs}
     Execution Context: {execution_context}
     Current Year: {current_year}
     
@@ -66,15 +22,18 @@ intent_classification_task:
     3. IMPLEMENTATION REQUEST - Operator wants something built, created, or implemented
     
     Consider the operator's experience level, context, and true intentions when classifying.
+    Use the operator context to tailor the workflow to their specific needs and preferences.
   expected_output: >
     Enhanced intent classification with operator context:
     
     INTENT: [INFORMATION/PLANNING/IMPLEMENTATION]
     CONFIDENCE: [High/Medium/Low]
     REASONING: Classification reasoning considering operator context
-    OPERATOR-AWARE WORKFLOW: [Workflow tailored to operator's needs]
+    OPERATOR-AWARE WORKFLOW: [Workflow tailored to operator's needs and experience level]
     
     Route to appropriate workflow with full operator context available to all agents.
+    All subsequent agents should consider the operator's technical background, project context, 
+    complexity preferences, and identified unstated needs.
   agent: project_orchestrator
 
 project_analysis_task:

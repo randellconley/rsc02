@@ -4,7 +4,7 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.llm import LLM
-from typing import List
+from typing import List, Dict, Any
 from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
 )
@@ -12,6 +12,7 @@ from rscrew.tools.programming_tools import (
     OperatorIntentTools, ProjectManagementTools, TechnicalResearchTools, ArchitectureTools,
     DevelopmentTools, QualityAssuranceTools, DocumentationTools
 )
+from rscrew.interactive_dialogue import conduct_operator_dialogue
 
 # Version information for deployment tracking
 RSCREW_VERSION = "v3.0-programming-assistant"
@@ -281,16 +282,8 @@ class Rscrew():
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
-    @task
-    def operator_intent_dialogue_task(self) -> Task:
-        debug_print("=== Creating Operator Intent Dialogue Task ===")
-        task = Task(
-            config=self.tasks_config['operator_intent_dialogue_task'], # type: ignore[index]
-            agent=self.operator_intent_interpreter()
-        )
-        debug_print(f"Operator Intent Dialogue task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
-        debug_print("===============================================")
-        return task
+# NOTE: operator_intent_dialogue_task is now handled by interactive_dialogue.py 
+# before the CrewAI workflow starts. This ensures proper CLI interaction.
 
     @task
     def intent_classification_task(self) -> Task:
@@ -392,6 +385,43 @@ class Rscrew():
         debug_print(f"Documentation task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
         debug_print("====================================")
         return task
+
+    def run_with_interactive_dialogue(self, inputs: Dict[str, Any]) -> str:
+        """
+        Run the crew with interactive operator dialogue for enhanced context
+        
+        Args:
+            inputs: Standard crew inputs including 'topic' and 'execution_context'
+            
+        Returns:
+            Final crew output with operator context integration
+        """
+        # Extract original inputs
+        user_request = inputs.get('topic', '')
+        execution_context = inputs.get('execution_context', '')
+        
+        # Conduct interactive dialogue to gather operator context
+        debug_print("=== Starting Interactive Operator Dialogue ===")
+        operator_context = conduct_operator_dialogue(user_request, execution_context)
+        debug_print("=== Operator Dialogue Complete ===")
+        
+        # Enhance inputs with operator context
+        enhanced_inputs = {
+            **inputs,  # Keep original inputs
+            'topic': operator_context['enhanced_request'],  # Use enhanced request
+            'operator_context': operator_context['operator_context'],
+            'technical_background': operator_context['technical_background'],
+            'project_context': operator_context['project_context'],
+            'complexity_preference': operator_context['complexity_preference'],
+            'qa_dialogue': operator_context['qa_dialogue'],
+            'unstated_needs': operator_context['unstated_needs']
+        }
+        
+        debug_print(f"Enhanced inputs: {list(enhanced_inputs.keys())}")
+        
+        # Run the crew with enhanced context
+        crew_instance = self.crew()
+        return crew_instance.kickoff(inputs=enhanced_inputs)
 
     @crew
     def crew(self) -> Crew:

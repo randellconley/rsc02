@@ -47,7 +47,7 @@ EXECUTION CONTEXT:
     return context
 
 def run_crew_with_prompt(user_prompt):
-    """Run the crew with a custom prompt."""
+    """Run the crew with a custom prompt using interactive dialogue."""
     # Check if debug mode is enabled
     debug_mode = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
     
@@ -57,44 +57,36 @@ def run_crew_with_prompt(user_prompt):
     
     execution_context = get_execution_context()
     
-    # Combine user prompt with execution context
-    full_prompt = f"{execution_context}\n\nUSER REQUEST:\n{user_prompt}"
-    
+    # Prepare initial inputs
     inputs = {
         'topic': user_prompt,
         'current_year': str(datetime.now().year),
-        'execution_context': execution_context,
-        'full_prompt': full_prompt
+        'execution_context': execution_context
     }
     
-    debug_print(f"=== RC Inputs Debug ===")
+    debug_print(f"=== RC Initial Inputs Debug ===")
     debug_print(f"Inputs keys: {list(inputs.keys())}")
     debug_print(f"Topic: {inputs['topic']}")
     debug_print(f"Current year: {inputs['current_year']}")
     debug_print(f"Execution context length: {len(inputs['execution_context'])}")
-    debug_print(f"Full prompt length: {len(inputs['full_prompt'])}")
-    debug_print("======================")
+    debug_print("===============================")
     
     try:
-        print("🚀 Starting RSCrew with custom prompt...")
+        print("🚀 Starting RSCrew with Interactive Operator Dialogue...")
         print(f"📍 Working from: {os.getcwd()}")
-        print(f"💭 Prompt: {user_prompt}")
-        print("-" * 50)
+        print(f"💭 Request: {user_prompt}")
         
         debug_print("Creating Rscrew instance...")
         crew_instance = Rscrew()
         debug_print("Rscrew instance created")
         
-        debug_print("Getting crew...")
-        crew = crew_instance.crew()
-        debug_print("Crew obtained")
+        debug_print("Starting interactive dialogue workflow...")
+        result = crew_instance.run_with_interactive_dialogue(inputs)
+        debug_print("Interactive workflow completed")
         
-        debug_print("Starting kickoff...")
-        result = crew.kickoff(inputs=inputs)
-        debug_print("Kickoff completed")
-        
-        print("-" * 50)
-        print("✅ RSCrew completed!")
+        print("\n" + "="*60)
+        print("✅ RSCrew completed successfully!")
+        print("="*60)
         return result
         
     except Exception as e:
