@@ -1,45 +1,179 @@
-research_task:
+project_analysis_task:
   description: >
-    You are working as a Senior Data Researcher. The user has made the following request:
+    As the Project Orchestrator, analyze the user's request and define the project scope:
     
-    {topic}
+    User Request: {topic}
+    Execution Context: {execution_context}
+    Current Year: {current_year}
     
-    Context about where this command was executed:
-    {execution_context}
+    Your responsibilities:
+    1. Analyze and understand the complete user requirements
+    2. Identify key project objectives and success criteria
+    3. Break down the request into manageable components
+    4. Identify potential challenges and risks
+    5. Define the overall project approach and methodology
+    6. Create a high-level project plan with phases
+    7. Determine which specialist agents will be needed for each phase
     
-    Based on this request and context, conduct thorough research and analysis.
-    If the user is asking about files or directories, examine them carefully.
-    If they want code analysis, review the code structure and content.
-    If they need improvements or suggestions, provide actionable recommendations.
-    
-    Current year: {current_year}
+    Consider the technical complexity, resource requirements, and deliverable expectations.
   expected_output: >
-    A comprehensive analysis addressing the user's request. This should include:
-    - Direct response to what the user asked for
-    - Relevant findings from examining the execution context
-    - Specific details about files, code, or content if applicable
-    - Actionable insights and recommendations
-    Format as clear, organized information that directly addresses the user's needs.
-  agent: researcher
+    A comprehensive project analysis including:
+    - Project scope and objectives summary
+    - Key requirements breakdown
+    - Identified challenges and risk factors
+    - Recommended project phases and approach
+    - Agent assignment strategy for upcoming tasks
+    - Success criteria and quality gates
+    Format as a structured project brief that guides the entire development process.
+  agent: project_orchestrator
 
-reporting_task:
+technical_research_task:
   description: >
-    You are a Reporting Analyst. Based on the research conducted, create a final response for the user.
+    As the Technical Research Specialist, conduct comprehensive technical research based on the project analysis:
     
-    Original user request: {topic}
+    Project Scope: Review the project orchestrator's analysis
+    User Request: {topic}
+    Execution Context: {execution_context}
     
-    The researcher has provided analysis. Now create a polished, actionable response that:
-    - Directly answers the user's question or request
-    - Provides clear recommendations if improvements were requested
-    - Includes specific examples or code snippets if relevant
-    - Organizes information in a logical, easy-to-follow structure
+    Your responsibilities:
+    1. Research relevant technologies, frameworks, and tools
+    2. Analyze existing codebase and project structure (if applicable)
+    3. Identify technical requirements and constraints
+    4. Evaluate potential solutions and approaches
+    5. Research best practices and industry standards
+    6. Assess technical feasibility and complexity
+    7. Identify dependencies and integration requirements
     
-    If the user requested file analysis, include specific findings about those files.
-    If they asked for code review, provide concrete suggestions.
-    If they wanted project analysis, give comprehensive insights.
+    Focus on providing actionable technical insights that will inform the solution design.
   expected_output: >
-    A well-structured, actionable response that directly addresses the user's request.
-    Include specific recommendations, examples, and next steps where appropriate.
-    Format as clear markdown without code block markers ('```').
-    Make it practical and immediately useful to the user.
-  agent: reporting_analyst
+    A detailed technical research report including:
+    - Technology stack recommendations with justifications
+    - Analysis of existing code/project structure
+    - Technical requirements and constraints
+    - Feasibility assessment and complexity analysis
+    - Best practices and standards to follow
+    - Dependency and integration considerations
+    - Risk assessment and mitigation strategies
+    Format as a technical brief that informs architectural decisions.
+  agent: research_analyst
+
+solution_design_task:
+  description: >
+    As the Solution Architect, design the technical solution based on project analysis and research:
+    
+    Project Analysis: Review the orchestrator's project breakdown
+    Technical Research: Use the research analyst's findings
+    User Request: {topic}
+    
+    Your responsibilities:
+    1. Design overall system architecture and components
+    2. Create technical specifications and interfaces
+    3. Define data models and database schemas (if needed)
+    4. Plan API designs and integration patterns
+    5. Specify security and performance requirements
+    6. Create implementation roadmap and milestones
+    7. Design testing and validation strategies
+    
+    Ensure the design is scalable, maintainable, and follows best practices.
+  expected_output: >
+    A comprehensive solution design document including:
+    - System architecture diagram and component breakdown
+    - Technical specifications and interface definitions
+    - Data models and schema designs
+    - API specifications and integration plans
+    - Security and performance requirements
+    - Implementation roadmap with clear milestones
+    - Testing and validation strategy
+    Format as a detailed technical design that guides implementation.
+  agent: solution_architect
+
+implementation_task:
+  description: >
+    As the Senior Software Developer, implement the designed solution:
+    
+    Solution Design: Follow the architect's specifications
+    Technical Requirements: Use research findings
+    User Request: {topic}
+    
+    Your responsibilities:
+    1. Implement the designed solution components
+    2. Write clean, efficient, and well-documented code
+    3. Follow coding standards and best practices
+    4. Implement proper error handling and edge cases
+    5. Create unit tests and integration tests
+    6. Ensure security best practices are followed
+    7. Optimize for performance and maintainability
+    
+    Focus on creating production-ready code that meets all specifications.
+  expected_output: >
+    Complete implementation including:
+    - All required source code files with proper structure
+    - Comprehensive code documentation and comments
+    - Unit tests and integration tests
+    - Error handling and input validation
+    - Security implementations and best practices
+    - Performance optimizations where applicable
+    - Installation and setup instructions
+    Format as ready-to-deploy code with clear documentation.
+  agent: code_implementer
+
+quality_assurance_task:
+  description: >
+    As the Quality Assurance Engineer, review and test the implemented solution:
+    
+    Implementation: Review the developer's code and tests
+    Solution Design: Validate against architectural specifications
+    User Request: {topic}
+    
+    Your responsibilities:
+    1. Conduct comprehensive code review for quality and standards
+    2. Validate implementation against design specifications
+    3. Execute functional and non-functional testing
+    4. Verify security implementations and best practices
+    5. Test error handling and edge cases
+    6. Validate performance and scalability
+    7. Ensure comprehensive test coverage
+    
+    Identify any issues, bugs, or improvements needed before final delivery.
+  expected_output: >
+    A comprehensive quality assurance report including:
+    - Code review findings and recommendations
+    - Test execution results and coverage analysis
+    - Security validation and compliance check
+    - Performance testing results
+    - Bug reports and issue tracking
+    - Quality metrics and standards compliance
+    - Final approval status and remaining actions
+    Format as a detailed QA report with clear pass/fail criteria.
+  agent: quality_assurance
+
+documentation_task:
+  description: >
+    As the Technical Documentation Specialist, create comprehensive documentation:
+    
+    Implementation: Document the developer's code and architecture
+    QA Results: Include testing and quality findings
+    Solution Design: Document the architectural decisions
+    User Request: {topic}
+    
+    Your responsibilities:
+    1. Create comprehensive API documentation
+    2. Write user guides and tutorials
+    3. Document system architecture and design decisions
+    4. Create installation and deployment guides
+    5. Write troubleshooting and maintenance documentation
+    6. Document testing procedures and quality standards
+    7. Create developer onboarding documentation
+    
+    Ensure documentation is clear, accurate, and useful for all stakeholders.
+  expected_output: >
+    Complete documentation package including:
+    - API documentation with examples and usage
+    - User guides and step-by-step tutorials
+    - System architecture and design documentation
+    - Installation, deployment, and configuration guides
+    - Troubleshooting and FAQ documentation
+    - Developer documentation and code comments
+    - Testing and quality assurance procedures
+    Format as professional documentation ready for end users and developers.
+  agent: technical_writer

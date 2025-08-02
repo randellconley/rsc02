@@ -8,11 +8,15 @@ from typing import List
 from rscrew.tools.custom_tool import (
     ReadFile, WriteFile, ListDirectory, FindFiles, GetFileInfo
 )
+from rscrew.tools.programming_tools import (
+    ProjectManagementTools, TechnicalResearchTools, ArchitectureTools,
+    DevelopmentTools, QualityAssuranceTools, DocumentationTools
+)
 
 # Version information for deployment tracking
-RSCREW_VERSION = "v2.2-simplified"
-RSCREW_FEATURES = ["null-response-handling", "debug-monitoring"]
-RSCREW_COMMIT = "simplified"  # Simplified version without retry logic
+RSCREW_VERSION = "v3.0-programming-assistant"
+RSCREW_FEATURES = ["null-response-handling", "debug-monitoring", "programming-assistant-crew"]
+RSCREW_COMMIT = "programming-assistant"  # Full programming assistant crew implementation
 
 # Debug toggle - only enabled when explicitly set to 'true'
 DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'false').lower() == 'true'
@@ -20,6 +24,70 @@ DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'false').lower() == 'true'
 def debug_print(message):
     if DEBUG_MODE:
         print(f"[DEBUG] {message}")
+
+def create_llm_with_monitoring(agent_name: str):
+    """Create an LLM instance with monitoring and error handling for the specified agent"""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    
+    try:
+        llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
+        debug_print(f"LLM created for {agent_name}: {llm.model}")
+        
+        # Fix LLM call method - ensure proper method binding and error handling
+        if llm and hasattr(llm, 'call'):
+            original_call = llm.call
+            
+            def fixed_call(*args, **kwargs):
+                if DEBUG_MODE:
+                    debug_print(f"=== CrewAI LLM Call Intercepted ({agent_name} - {RSCREW_VERSION}) ===")
+                    debug_print(f"Features Active: {', '.join(RSCREW_FEATURES)}")
+                    debug_print(f"Args count: {len(args)}")
+                    debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
+                    if args:
+                        debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
+                        debug_print(f"Prompt type: {type(args[0])}")
+                        if isinstance(args[0], list):
+                            debug_print(f"Prompt is list with {len(args[0])} items")
+                            for i, item in enumerate(args[0][:3]):  # Show first 3 items
+                                debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
+                        else:
+                            debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
+                
+                try:
+                    # Ensure we have valid arguments
+                    if not args or args[0] is None:
+                        if DEBUG_MODE:
+                            debug_print(f"WARNING: Empty or None prompt detected ({agent_name})")
+                        return ""
+                    
+                    result = original_call(*args, **kwargs)
+                    
+                    # Ensure we return a valid result (convert None to empty string)
+                    if result is None:
+                        if DEBUG_MODE:
+                            debug_print(f"WARNING: LLM returned None, converting to empty string ({agent_name})")
+                        result = ""
+                    
+                    if DEBUG_MODE:
+                        debug_print(f"LLM call result type: {type(result)}")
+                        debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
+                        debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
+                        debug_print(f"=== End LLM Call ({agent_name}) ===")
+                    return result
+                except Exception as e:
+                    if DEBUG_MODE:
+                        debug_print(f"LLM call failed ({agent_name}): {e}")
+                        debug_print(f"Exception type: {type(e)}")
+                        debug_print(f"=== End LLM Call ({agent_name} - Failed) ===")
+                    raise
+            
+            llm.call = fixed_call
+            
+    except Exception as e:
+        debug_print(f"ERROR creating LLM for {agent_name}: {e}")
+        llm = None
+    
+    return llm
 
 # Set up logging for CrewAI internals (but suppress verbose LiteLLM logs)
 if DEBUG_MODE:
@@ -68,208 +136,193 @@ class Rscrew():
     # If you would like to add tools to your agents, you can learn more about it here:
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
-    def researcher(self) -> Agent:
-        debug_print("=== Creating Researcher Agent ===")
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        
-        try:
-            llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-            debug_print(f"LLM created: {llm.model}")
-            
-            # Fix LLM call method - ensure proper method binding and error handling
-            if llm and hasattr(llm, 'call'):
-                original_call = llm.call
-                def fixed_call(*args, **kwargs):
-                    if DEBUG_MODE:
-                        debug_print(f"=== CrewAI LLM Call Intercepted ({RSCREW_VERSION}) ===")
-                        debug_print(f"Features Active: {', '.join(RSCREW_FEATURES)}")
-                        debug_print(f"Args count: {len(args)}")
-                        debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
-                        if args:
-                            debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
-                            debug_print(f"Prompt type: {type(args[0])}")
-                            if isinstance(args[0], list):
-                                debug_print(f"Prompt is list with {len(args[0])} items")
-                                for i, item in enumerate(args[0][:3]):  # Show first 3 items
-                                    debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
-                            else:
-                                debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
-                    
-                    try:
-                        # Ensure we have valid arguments
-                        if not args or args[0] is None:
-                            if DEBUG_MODE:
-                                debug_print("WARNING: Empty or None prompt detected")
-                            return ""
-                        
-                        result = original_call(*args, **kwargs)
-                        
-                        # Ensure we return a valid result (convert None to empty string)
-                        if result is None:
-                            if DEBUG_MODE:
-                                debug_print("WARNING: LLM returned None, converting to empty string")
-                            result = ""
-                        
-                        if DEBUG_MODE:
-                            debug_print(f"LLM call result type: {type(result)}")
-                            debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
-                            debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
-                            debug_print("=== End LLM Call ===")
-                        return result
-                    except Exception as e:
-                        if DEBUG_MODE:
-                            debug_print(f"LLM call failed: {e}")
-                            debug_print(f"Exception type: {type(e)}")
-                            debug_print("=== End LLM Call (Failed) ===")
-                        raise
-                
-                llm.call = fixed_call
-                
-        except Exception as e:
-            debug_print(f"ERROR creating LLM: {e}")
-            llm = None
-        
-        # Test LLM directly
-        if llm and DEBUG_MODE:
-            try:
-                debug_print("Testing LLM with simple call...")
-                test_response = llm.call("Say 'test successful'")
-                debug_print(f"Simple test response: {test_response}")
-                debug_print(f"Response type: {type(test_response)}")
-                debug_print(f"Response length: {len(str(test_response)) if test_response else 0}")
-                
-                # Test with a more complex prompt similar to what CrewAI might send
-                debug_print("Testing LLM with complex prompt...")
-                complex_prompt = """You are a Senior Data Researcher. Your goal is to uncover cutting-edge developments in hello.
-                
-Please respond with a brief analysis of the topic 'hello'."""
-                complex_response = llm.call(complex_prompt)
-                debug_print(f"Complex test response: {complex_response}")
-                debug_print(f"Complex response type: {type(complex_response)}")
-                debug_print(f"Complex response length: {len(str(complex_response)) if complex_response else 0}")
-                
-            except Exception as e:
-                debug_print(f"LLM test failed: {e}")
-                debug_print(f"Exception type: {type(e)}")
-                debug_print(f"Exception args: {e.args}")
-        
-        debug_print("===================================")
+    def project_orchestrator(self) -> Agent:
+        debug_print("=== Creating Project Orchestrator Agent ===")
+        llm = create_llm_with_monitoring("Project Orchestrator")
         
         agent = Agent(
-            config=self.agents_config['researcher'], # type: ignore[index]
-            tools=[ReadFile(), ListDirectory(), FindFiles(), GetFileInfo()],
+            config=self.agents_config['project_orchestrator'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ProjectManagementTools.analyze_project_scope,
+                ProjectManagementTools.create_task_breakdown
+            ],
             verbose=True,
             llm=llm
         )
         
-        debug_print(f"Agent created with LLM: {getattr(agent, 'llm', 'None')}")
-        debug_print(f"Agent LLM model: {getattr(agent.llm, 'model', 'Unknown') if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
-        debug_print(f"Agent LLM type: {type(agent.llm) if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
+        debug_print(f"Project Orchestrator created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("===========================================")
         return agent
 
     @agent
-    def reporting_analyst(self) -> Agent:
-        debug_print("=== Creating Reporting Analyst Agent ===")
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        
-        try:
-            llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-            debug_print(f"LLM created: {llm.model}")
-            
-            # Fix LLM call method - ensure proper method binding and error handling
-            if llm and hasattr(llm, 'call'):
-                original_call = llm.call
-                
-                def fixed_call(*args, **kwargs):
-                    if DEBUG_MODE:
-                        debug_print(f"=== CrewAI LLM Call Intercepted (Reporting Analyst - {RSCREW_VERSION}) ===")
-                        debug_print(f"Features Active: {', '.join(RSCREW_FEATURES)}")
-                        debug_print(f"Args count: {len(args)}")
-                        debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else None}")
-                        
-                        if args:
-                            debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
-                            debug_print(f"Prompt type: {type(args[0])}")
-                            
-                            if isinstance(args[0], list):
-                                debug_print(f"Prompt is list with {len(args[0])} items")
-                                for i, item in enumerate(args[0][:3]):  # Show first 3 items
-                                    debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
-                            else:
-                                debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
-                    
-                    try:
-                        # Ensure we have valid arguments
-                        if not args or args[0] is None:
-                            if DEBUG_MODE:
-                                debug_print("WARNING: Empty or None prompt detected (Reporting Analyst)")
-                            return ""
-                        
-                        result = original_call(*args, **kwargs)
-                        
-                        # Ensure we return a valid result (convert None to empty string)
-                        if result is None:
-                            if DEBUG_MODE:
-                                debug_print("WARNING: LLM returned None, converting to empty string (Reporting Analyst)")
-                            result = ""
-                        
-                        if DEBUG_MODE:
-                            debug_print(f"LLM call result type: {type(result)}")
-                            debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
-                            debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
-                            debug_print("=== End LLM Call (Reporting Analyst) ===")
-                        return result
-                    except Exception as e:
-                        if DEBUG_MODE:
-                            debug_print(f"LLM call failed: {e}")
-                            debug_print(f"Exception type: {type(e)}")
-                            debug_print("=== End LLM Call (Reporting Analyst - Failed) ===")
-                        raise
-                
-                llm.call = fixed_call
-                
-        except Exception as e:
-            debug_print(f"ERROR creating LLM: {e}")
-            llm = None
-        
-        debug_print("========================================")
+    def research_analyst(self) -> Agent:
+        debug_print("=== Creating Research Analyst Agent ===")
+        llm = create_llm_with_monitoring("Research Analyst")
         
         agent = Agent(
-            config=self.agents_config['reporting_analyst'], # type: ignore[index]
-            tools=[ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo()],
+            config=self.agents_config['research_analyst'], # type: ignore[index]
+            tools=[
+                ReadFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                TechnicalResearchTools.analyze_codebase_structure,
+                TechnicalResearchTools.research_technology_stack
+            ],
             verbose=True,
             llm=llm
         )
         
-        debug_print(f"Agent created with LLM: {getattr(agent, 'llm', 'None')}")
-        debug_print(f"Agent LLM model: {getattr(agent.llm, 'model', 'Unknown') if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
-        debug_print(f"Agent LLM type: {type(agent.llm) if hasattr(agent, 'llm') and agent.llm else 'No LLM'}")
+        debug_print(f"Research Analyst created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("========================================")
+        return agent
+
+    @agent
+    def solution_architect(self) -> Agent:
+        debug_print("=== Creating Solution Architect Agent ===")
+        llm = create_llm_with_monitoring("Solution Architect")
+        
+        agent = Agent(
+            config=self.agents_config['solution_architect'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                ArchitectureTools.design_system_architecture,
+                ArchitectureTools.create_api_specification
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Solution Architect created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("==========================================")
+        return agent
+
+    @agent
+    def code_implementer(self) -> Agent:
+        debug_print("=== Creating Code Implementer Agent ===")
+        llm = create_llm_with_monitoring("Code Implementer")
+        
+        agent = Agent(
+            config=self.agents_config['code_implementer'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                DevelopmentTools.generate_project_structure,
+                DevelopmentTools.create_code_template
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Code Implementer created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("========================================")
+        return agent
+
+    @agent
+    def quality_assurance(self) -> Agent:
+        debug_print("=== Creating Quality Assurance Agent ===")
+        llm = create_llm_with_monitoring("Quality Assurance")
+        
+        agent = Agent(
+            config=self.agents_config['quality_assurance'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                QualityAssuranceTools.create_test_plan,
+                QualityAssuranceTools.perform_code_review
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Quality Assurance created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("=========================================")
+        return agent
+
+    @agent
+    def technical_writer(self) -> Agent:
+        debug_print("=== Creating Technical Writer Agent ===")
+        llm = create_llm_with_monitoring("Technical Writer")
+        
+        agent = Agent(
+            config=self.agents_config['technical_writer'], # type: ignore[index]
+            tools=[
+                ReadFile(), WriteFile(), ListDirectory(), FindFiles(), GetFileInfo(),
+                DocumentationTools.generate_api_documentation,
+                DocumentationTools.create_user_guide
+            ],
+            verbose=True,
+            llm=llm
+        )
+        
+        debug_print(f"Technical Writer created with LLM: {getattr(agent, 'llm', 'None')}")
+        debug_print("========================================")
         return agent
 
     # To learn more about structured task outputs,
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
     @task
-    def research_task(self) -> Task:
-        debug_print("=== Creating Research Task ===")
+    def project_analysis_task(self) -> Task:
+        debug_print("=== Creating Project Analysis Task ===")
         task = Task(
-            config=self.tasks_config['research_task'], # type: ignore[index]
-            agent=self.researcher()
+            config=self.tasks_config['project_analysis_task'], # type: ignore[index]
+            agent=self.project_orchestrator()
         )
-        debug_print(f"Research task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
-        debug_print("==============================")
+        debug_print(f"Project Analysis task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("=======================================")
         return task
 
     @task
-    def reporting_task(self) -> Task:
-        debug_print("=== Creating Reporting Task ===")
+    def technical_research_task(self) -> Task:
+        debug_print("=== Creating Technical Research Task ===")
         task = Task(
-            config=self.tasks_config['reporting_task'], # type: ignore[index]
-            agent=self.reporting_analyst(),
-            output_file='report.md'
+            config=self.tasks_config['technical_research_task'], # type: ignore[index]
+            agent=self.research_analyst()
         )
-        debug_print(f"Reporting task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
-        debug_print("===============================")
+        debug_print(f"Technical Research task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("========================================")
+        return task
+
+    @task
+    def solution_design_task(self) -> Task:
+        debug_print("=== Creating Solution Design Task ===")
+        task = Task(
+            config=self.tasks_config['solution_design_task'], # type: ignore[index]
+            agent=self.solution_architect()
+        )
+        debug_print(f"Solution Design task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("======================================")
+        return task
+
+    @task
+    def implementation_task(self) -> Task:
+        debug_print("=== Creating Implementation Task ===")
+        task = Task(
+            config=self.tasks_config['implementation_task'], # type: ignore[index]
+            agent=self.code_implementer()
+        )
+        debug_print(f"Implementation task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("====================================")
+        return task
+
+    @task
+    def quality_assurance_task(self) -> Task:
+        debug_print("=== Creating Quality Assurance Task ===")
+        task = Task(
+            config=self.tasks_config['quality_assurance_task'], # type: ignore[index]
+            agent=self.quality_assurance()
+        )
+        debug_print(f"Quality Assurance task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("========================================")
+        return task
+
+    @task
+    def documentation_task(self) -> Task:
+        debug_print("=== Creating Documentation Task ===")
+        task = Task(
+            config=self.tasks_config['documentation_task'], # type: ignore[index]
+            agent=self.technical_writer(),
+            output_file='programming_assistant_report.md'
+        )
+        debug_print(f"Documentation task created with agent: {getattr(task.agent, 'role', 'Unknown').strip()}")
+        debug_print("====================================")
         return task
 
     @crew
