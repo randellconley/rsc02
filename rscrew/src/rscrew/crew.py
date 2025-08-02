@@ -66,37 +66,53 @@ class Rscrew():
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
             debug_print(f"LLM created: {llm.model}")
             
-            # Add debugging wrapper to intercept CrewAI's LLM calls
-            if DEBUG_MODE:
+            # Fix LLM call method - ensure proper method binding and error handling
+            if llm and hasattr(llm, 'call'):
                 original_call = llm.call
-                def debug_call(*args, **kwargs):
-                    debug_print(f"=== CrewAI LLM Call Intercepted ===")
-                    debug_print(f"Args count: {len(args)}")
-                    debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
-                    if args:
-                        debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
-                        debug_print(f"Prompt type: {type(args[0])}")
-                        if isinstance(args[0], list):
-                            debug_print(f"Prompt is list with {len(args[0])} items")
-                            for i, item in enumerate(args[0][:3]):  # Show first 3 items
-                                debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
-                        else:
-                            debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
+                def fixed_call(*args, **kwargs):
+                    if DEBUG_MODE:
+                        debug_print(f"=== CrewAI LLM Call Intercepted ===")
+                        debug_print(f"Args count: {len(args)}")
+                        debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
+                        if args:
+                            debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
+                            debug_print(f"Prompt type: {type(args[0])}")
+                            if isinstance(args[0], list):
+                                debug_print(f"Prompt is list with {len(args[0])} items")
+                                for i, item in enumerate(args[0][:3]):  # Show first 3 items
+                                    debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
+                            else:
+                                debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
                     
                     try:
+                        # Ensure we have valid arguments
+                        if not args or args[0] is None:
+                            if DEBUG_MODE:
+                                debug_print("WARNING: Empty or None prompt detected")
+                            return ""
+                        
                         result = original_call(*args, **kwargs)
-                        debug_print(f"LLM call result type: {type(result)}")
-                        debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
-                        debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
-                        debug_print("=== End LLM Call ===")
+                        
+                        # Ensure we return a valid result
+                        if result is None:
+                            if DEBUG_MODE:
+                                debug_print("WARNING: LLM returned None, converting to empty string")
+                            result = ""
+                        
+                        if DEBUG_MODE:
+                            debug_print(f"LLM call result type: {type(result)}")
+                            debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
+                            debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
+                            debug_print("=== End LLM Call ===")
                         return result
                     except Exception as e:
-                        debug_print(f"LLM call failed: {e}")
-                        debug_print(f"Exception type: {type(e)}")
-                        debug_print("=== End LLM Call (Failed) ===")
+                        if DEBUG_MODE:
+                            debug_print(f"LLM call failed: {e}")
+                            debug_print(f"Exception type: {type(e)}")
+                            debug_print("=== End LLM Call (Failed) ===")
                         raise
                 
-                llm.call = debug_call
+                llm.call = fixed_call
                 
         except Exception as e:
             debug_print(f"ERROR creating LLM: {e}")
@@ -149,40 +165,56 @@ Please respond with a brief analysis of the topic 'hello'."""
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
             debug_print(f"LLM created: {llm.model}")
             
-            # Add debug wrapper to reporting analyst LLM as well
-            if DEBUG_MODE and llm and hasattr(llm, 'call'):
+            # Fix LLM call method - ensure proper method binding and error handling
+            if llm and hasattr(llm, 'call'):
                 original_call = llm.call
                 
-                def debug_call(*args, **kwargs):
-                    debug_print("=== CrewAI LLM Call Intercepted (Reporting Analyst) ===")
-                    debug_print(f"Args count: {len(args)}")
-                    debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else None}")
-                    
-                    if args:
-                        debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
-                        debug_print(f"Prompt type: {type(args[0])}")
+                def fixed_call(*args, **kwargs):
+                    if DEBUG_MODE:
+                        debug_print("=== CrewAI LLM Call Intercepted (Reporting Analyst) ===")
+                        debug_print(f"Args count: {len(args)}")
+                        debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else None}")
                         
-                        if isinstance(args[0], list):
-                            debug_print(f"Prompt is list with {len(args[0])} items")
-                            for i, item in enumerate(args[0][:3]):  # Show first 3 items
-                                debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
-                        else:
-                            debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
+                        if args:
+                            debug_print(f"Prompt length: {len(str(args[0])) if args[0] else 0}")
+                            debug_print(f"Prompt type: {type(args[0])}")
+                            
+                            if isinstance(args[0], list):
+                                debug_print(f"Prompt is list with {len(args[0])} items")
+                                for i, item in enumerate(args[0][:3]):  # Show first 3 items
+                                    debug_print(f"  Item {i}: {type(item)} - {str(item)[:100]}...")
+                            else:
+                                debug_print(f"Prompt preview: {str(args[0])[:200]}..." if args[0] and len(str(args[0])) > 200 else str(args[0]))
                     
                     try:
+                        # Ensure we have valid arguments
+                        if not args or args[0] is None:
+                            if DEBUG_MODE:
+                                debug_print("WARNING: Empty or None prompt detected (Reporting Analyst)")
+                            return ""
+                        
                         result = original_call(*args, **kwargs)
-                        debug_print(f"LLM call result type: {type(result)}")
-                        debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
-                        debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
-                        debug_print("=== End LLM Call (Reporting Analyst) ===")
+                        
+                        # Ensure we return a valid result
+                        if result is None:
+                            if DEBUG_MODE:
+                                debug_print("WARNING: LLM returned None, converting to empty string (Reporting Analyst)")
+                            result = ""
+                        
+                        if DEBUG_MODE:
+                            debug_print(f"LLM call result type: {type(result)}")
+                            debug_print(f"LLM call result length: {len(str(result)) if result else 0}")
+                            debug_print(f"LLM call result preview: {str(result)[:200]}..." if result and len(str(result)) > 200 else str(result))
+                            debug_print("=== End LLM Call (Reporting Analyst) ===")
                         return result
                     except Exception as e:
-                        debug_print(f"LLM call failed: {e}")
-                        debug_print(f"Exception type: {type(e)}")
-                        debug_print("=== End LLM Call (Reporting Analyst - Failed) ===")
+                        if DEBUG_MODE:
+                            debug_print(f"LLM call failed: {e}")
+                            debug_print(f"Exception type: {type(e)}")
+                            debug_print("=== End LLM Call (Reporting Analyst - Failed) ===")
                         raise
                 
-                llm.call = debug_call
+                llm.call = fixed_call
                 
         except Exception as e:
             debug_print(f"ERROR creating LLM: {e}")
