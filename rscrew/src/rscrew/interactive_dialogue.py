@@ -1,57 +1,323 @@
 """
-Interactive Operator Intent Dialogue System
+Interactive Operator Intent Dialogue System - Hybrid Approach
 
 Conducts CLI-friendly Q&A before launching the main CrewAI workflow
-to gather comprehensive operator context and intentions.
+using cached domain patterns for known domains and dynamic generation for novel requests.
 """
 
 import sys
+import re
 from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
+
+
+@dataclass
+class DomainMatch:
+    domain: str
+    confidence: float
+    keywords_found: List[str]
 
 
 class OperatorDialogue:
-    """Handles interactive dialogue with the operator to understand context and intent"""
+    """Handles interactive dialogue with hybrid cached/dynamic questioning"""
     
     def __init__(self):
         self.qa_history: List[Tuple[str, str]] = []
         self.operator_context: Dict[str, str] = {}
+        self.domain_patterns = self._initialize_domain_patterns()
+        self.domain_questions = self._initialize_domain_questions()
+        self._cached_questions: Optional[List[str]] = None
     
-    def analyze_request_gaps(self, user_request: str, execution_context: str) -> List[str]:
-        """Analyze user request to identify key context gaps that need clarification"""
-        request_lower = user_request.lower()
+    def _initialize_domain_patterns(self) -> Dict:
+        """Initialize domain detection patterns (cache)"""
+        return {
+            'web_development': {
+                'keywords': ['api', 'rest', 'web', 'frontend', 'backend', 'server', 'endpoint', 'http', 'json', 'flask', 'django', 'express', 'fastapi'],
+                'concepts': ['authentication', 'routing', 'middleware', 'cors', 'crud'],
+                'weight': 1.0
+            },
+            'machine_learning': {
+                'keywords': ['ml', 'model', 'prediction', 'classification', 'regression', 'neural', 'ai', 'training', 'classifier', 'algorithm'],
+                'concepts': ['dataset', 'features', 'accuracy', 'supervised', 'unsupervised'],
+                'weight': 1.0
+            },
+            'database': {
+                'keywords': ['database', 'schema', 'sql', 'nosql', 'query', 'table', 'data', 'storage', 'postgresql', 'mysql', 'mongodb'],
+                'concepts': ['relationships', 'indexing', 'normalization', 'transactions'],
+                'weight': 1.0
+            },
+            'mobile_development': {
+                'keywords': ['mobile', 'app', 'ios', 'android', 'react native', 'flutter', 'native'],
+                'concepts': ['cross-platform', 'app store', 'responsive', 'touch'],
+                'weight': 1.0
+            },
+            'devops': {
+                'keywords': ['deploy', 'ci/cd', 'docker', 'kubernetes', 'pipeline', 'automation'],
+                'concepts': ['monitoring', 'scaling', 'infrastructure', 'containerization'],
+                'weight': 1.0
+            },
+            'data_analysis': {
+                'keywords': ['analysis', 'visualization', 'dashboard', 'report', 'analytics', 'insights'],
+                'concepts': ['charts', 'metrics', 'kpi', 'business intelligence'],
+                'weight': 1.0
+            }
+        }
+    
+    def _initialize_domain_questions(self) -> Dict:
+        """Initialize domain-specific question banks (cache)"""
+        return {
+            'web_development': {
+                'technology_stack': [
+                    "What's your preferred backend framework? (Flask, Django, Express, FastAPI, etc.)",
+                    "Frontend requirements? (React, Vue, vanilla JS, or API-only?)",
+                    "Database preference? (PostgreSQL, MySQL, MongoDB, etc.)"
+                ],
+                'architecture': [
+                    "Authentication method? (JWT, OAuth, sessions, or none needed?)",
+                    "Expected scale? (personal project, small team, or high traffic?)",
+                    "Deployment preference? (cloud, local, or containerized?)"
+                ],
+                'requirements': [
+                    "Any specific integrations needed? (payment, email, third-party APIs)",
+                    "Real-time features required? (WebSockets, live updates)"
+                ]
+            },
+            'machine_learning': {
+                'problem_type': [
+                    "What type of ML problem? (classification, regression, clustering, NLP, computer vision)",
+                    "Supervised or unsupervised learning?",
+                    "Real-time predictions or batch processing?"
+                ],
+                'data': [
+                    "Do you have a dataset ready, or need help finding/creating one?",
+                    "Data size and format? (CSV, JSON, images, text files)",
+                    "Any data privacy or compliance requirements?"
+                ],
+                'deployment': [
+                    "Model deployment target? (local testing, cloud API, edge device)",
+                    "Performance requirements? (speed vs accuracy trade-offs)"
+                ]
+            },
+            'database': {
+                'design': [
+                    "Primary use case? (transactional, analytical, real-time, or mixed)",
+                    "Expected data volume and growth? (MB, GB, TB scale)",
+                    "Query patterns? (simple lookups, complex joins, aggregations)"
+                ],
+                'technology': [
+                    "SQL or NoSQL preference? (or unsure)",
+                    "Consistency vs performance priorities?",
+                    "Integration with existing systems?"
+                ]
+            },
+            'mobile_development': {
+                'platform': [
+                    "Target platforms? (iOS only, Android only, or both)",
+                    "Native performance needs or web-based acceptable?",
+                    "App store distribution or internal/enterprise use?"
+                ],
+                'features': [
+                    "Key features needed? (offline support, push notifications, camera, etc.)",
+                    "Backend integration requirements? (APIs, databases, cloud services)"
+                ]
+            },
+            'devops': {
+                'infrastructure': [
+                    "Current deployment process? (manual, basic scripts, or automated)",
+                    "Target platforms? (AWS, Azure, GCP, on-premise, or hybrid)",
+                    "Team size and release frequency?"
+                ],
+                'requirements': [
+                    "Primary goals? (faster deployments, reliability, cost optimization)",
+                    "Compliance or security requirements? (SOC2, HIPAA, etc.)"
+                ]
+            },
+            'data_analysis': {
+                'scope': [
+                    "Data source? (databases, files, APIs, or need to collect)",
+                    "Analysis type? (descriptive, predictive, or prescriptive)",
+                    "Audience? (technical team, executives, or external clients)"
+                ],
+                'output': [
+                    "Preferred output format? (interactive dashboard, static reports, or automated alerts)",
+                    "Update frequency? (real-time, daily, weekly, or on-demand)"
+                ]
+            }
+        }
+    
+    def detect_domains(self, request: str) -> List[DomainMatch]:
+        """Detect domains with confidence scoring"""
+        request_lower = request.lower()
+        domain_matches = []
+        
+        for domain, pattern in self.domain_patterns.items():
+            score = 0.0
+            keywords_found = []
+            
+            # Check keywords
+            for keyword in pattern['keywords']:
+                if keyword in request_lower:
+                    score += 2.0  # Increased weight for keywords
+                    keywords_found.append(keyword)
+            
+            # Check concepts (weighted higher)
+            for concept in pattern['concepts']:
+                if concept in request_lower:
+                    score += 3.0  # Increased weight for concepts
+                    keywords_found.append(concept)
+            
+            # Calculate confidence based on matches found, not total possible
+            if keywords_found:
+                # Base confidence on number of matches found
+                base_confidence = min(score / 10.0, 1.0)  # Scale to 0-1
+                # Boost confidence for multiple matches
+                match_bonus = min(len(keywords_found) * 0.1, 0.3)
+                confidence = min(base_confidence + match_bonus, 1.0)
+                
+                domain_matches.append(DomainMatch(domain, confidence, keywords_found))
+        
+        # Sort by confidence
+        return sorted(domain_matches, key=lambda x: x.confidence, reverse=True)
+    
+    def select_questioning_strategy(self, request: str) -> Tuple[str, Optional[str]]:
+        """Decide between cached or dynamic approach"""
+        domain_matches = self.detect_domains(request)
+        confidence_threshold = 0.15  # Lower threshold for better cache utilization
+        
+        if domain_matches and domain_matches[0].confidence >= confidence_threshold:
+            return "CACHED", domain_matches[0].domain
+        else:
+            return "DYNAMIC", None
+    
+    def get_cached_questions(self, domain: str, request: str) -> List[str]:
+        """Get prioritized questions for a known domain"""
+        if domain not in self.domain_questions:
+            return []
+        
+        domain_bank = self.domain_questions[domain]
         questions = []
         
-        # Technical context gaps
-        if any(tech in request_lower for tech in ['api', 'web', 'app', 'system', 'database', 'server']):
-            if not any(lang in request_lower for lang in ['python', 'javascript', 'java', 'go', 'rust', 'php', 'ruby']):
-                questions.append("What's your preferred programming language or current tech stack?")
+        # Prioritize question categories based on request analysis
+        for category, category_questions in domain_bank.items():
+            # Add most relevant questions from each category
+            questions.extend(category_questions[:2])  # Max 2 per category
         
-        # Purpose gaps
-        if not any(purpose in request_lower for purpose in ['learn', 'production', 'work', 'personal', 'experiment']):
-            questions.append("Is this for learning, a personal project, or production use?")
+        # Filter out questions already answered by request context
+        filtered_questions = self.filter_redundant_questions(questions, request)
         
-        # Experience/complexity gaps
-        if any(word in request_lower for word in ['create', 'build', 'implement', 'develop']):
-            if not any(level in request_lower for level in ['simple', 'basic', 'advanced', 'production', 'enterprise']):
-                questions.append("Are you looking for a simple learning example or a production-ready solution?")
+        return filtered_questions[:5]  # Max 5 questions
+    
+    def filter_redundant_questions(self, questions: List[str], request: str) -> List[str]:
+        """Remove questions already answered by the request context"""
+        request_lower = request.lower()
+        filtered = []
         
-        # Scope gaps
-        if any(word in request_lower for word in ['system', 'platform', 'application']):
-            if not any(scope in request_lower for scope in ['prototype', 'mvp', 'full', 'complete', 'basic']):
-                questions.append("Do you want something robust from the start, or prefer to start simple and expand?")
+        for question in questions:
+            # Skip if request already contains relevant information
+            if "framework" in question.lower() and any(fw in request_lower for fw in ['flask', 'django', 'express', 'react']):
+                continue
+            if "platform" in question.lower() and any(pl in request_lower for pl in ['ios', 'android', 'web']):
+                continue
+            if "database" in question.lower() and any(db in request_lower for db in ['postgres', 'mysql', 'mongo']):
+                continue
+            
+            filtered.append(question)
         
-        # Specific requirements
-        if any(word in request_lower for word in ['user', 'auth', 'login', 'management']):
-            questions.append("Do you need authentication, user roles, or just basic CRUD operations?")
-        elif any(word in request_lower for word in ['api', 'database', 'data']):
-            questions.append("Any specific requirements for data storage, authentication, or integrations?")
+        return filtered
+    
+    def generate_dynamic_question(self, request: str, question_number: int, max_questions: int) -> Optional[str]:
+        """Generate questions dynamically for unknown domains"""
+        context = self.extract_context_from_history()
         
-        # Integration context
-        if len(questions) < 5:  # Only ask if we haven't hit the limit
-            questions.append("Are you starting from scratch or integrating with existing systems?")
+        if question_number == 1:
+            return self.identify_core_challenge_question(request)
+        elif question_number == 2:
+            return self.generate_technology_question(request, context)
+        elif question_number == 3:
+            return self.generate_scope_question(request, context)
+        elif question_number == 4:
+            return self.generate_requirements_question(request, context)
+        elif question_number == 5:
+            return self.generate_context_question(request, context)
         
-        # Limit to 5 questions max
-        return questions[:5]
+        return None
+    
+    def identify_core_challenge_question(self, request: str) -> str:
+        """Generate first question to understand the core challenge"""
+        if any(word in request.lower() for word in ['create', 'build', 'develop', 'implement']):
+            return "What's the main challenge or goal you're trying to solve with this?"
+        elif any(word in request.lower() for word in ['analyze', 'understand', 'explain']):
+            return "What specific aspect would be most helpful to focus on?"
+        elif any(word in request.lower() for word in ['fix', 'debug', 'troubleshoot']):
+            return "What symptoms or issues are you experiencing?"
+        else:
+            return "What's your primary objective with this request?"
+    
+    def generate_technology_question(self, request: str, context: Dict) -> str:
+        """Generate technology-focused question based on context"""
+        if 'technology' not in context:
+            return "What technologies or tools are you currently using or prefer to use?"
+        else:
+            return "Any specific technical constraints or requirements to consider?"
+    
+    def generate_scope_question(self, request: str, context: Dict) -> str:
+        """Generate scope/complexity question"""
+        if 'scope' not in context:
+            return "Is this for learning/experimentation or production use?"
+        else:
+            return "What level of complexity or robustness do you need?"
+    
+    def generate_requirements_question(self, request: str, context: Dict) -> str:
+        """Generate requirements-focused question"""
+        return "Any specific requirements, constraints, or integrations needed?"
+    
+    def generate_context_question(self, request: str, context: Dict) -> str:
+        """Generate contextual question"""
+        return "Are you starting from scratch or working with existing systems?"
+    
+    def extract_context_from_history(self) -> Dict[str, str]:
+        """Extract context from previous Q&A"""
+        context = {}
+        for question, answer in self.qa_history:
+            if any(word in question.lower() for word in ['technology', 'framework', 'language']):
+                context['technology'] = answer
+            elif any(word in question.lower() for word in ['scope', 'complexity', 'production']):
+                context['scope'] = answer
+            elif any(word in question.lower() for word in ['challenge', 'goal', 'objective']):
+                context['objective'] = answer
+        return context
+    
+    def generate_next_question(self, user_request: str, execution_context: str, question_num: int, max_questions: int) -> Optional[str]:
+        """Generate next question using hybrid approach"""
+        strategy, domain = self.select_questioning_strategy(user_request)
+        
+        if strategy == "CACHED" and domain:
+            # Use cached questions for known domains
+            if not self._cached_questions:
+                self._cached_questions = self.get_cached_questions(domain, user_request)
+                print(f"🎯 Detected domain: {domain.replace('_', ' ').title()} (using optimized questions)")
+            
+            if question_num <= len(self._cached_questions):
+                return self._cached_questions[question_num - 1]
+            else:
+                return None  # No more cached questions
+        else:
+            # Use dynamic generation for unknown domains
+            if question_num == 1:
+                print("🔍 Novel request detected (using adaptive questioning)")
+            return self.generate_dynamic_question(user_request, question_num, max_questions)
+    
+    def has_sufficient_context(self) -> bool:
+        """Check if we have enough context to proceed"""
+        if len(self.qa_history) < 2:
+            return False
+        
+        # Check if we have key context areas covered
+        context = self.extract_context_from_history()
+        essential_areas = ['technology', 'scope', 'objective']
+        covered_areas = sum(1 for area in essential_areas if area in context)
+        
+        return covered_areas >= 2 or len(self.qa_history) >= 4
     
     def ask_question(self, question: str, question_num: int, total_questions: int) -> str:
         """Ask a single question and get user response"""
@@ -68,7 +334,7 @@ class OperatorDialogue:
             return "Interrupted"
     
     def conduct_dialogue(self, user_request: str, execution_context: str) -> Dict[str, str]:
-        """Conduct the full interactive dialogue"""
+        """Conduct the full interactive dialogue with adaptive questioning"""
         print("\n" + "="*60)
         print("🤖 OPERATOR INTENT INTERPRETER")
         print("="*60)
@@ -76,16 +342,24 @@ class OperatorDialogue:
         print("\nI'd like to understand your context better to provide the most relevant solution.")
         print("This will take 3-5 quick questions:")
         
-        # Generate questions based on request analysis
-        questions = self.analyze_request_gaps(user_request, execution_context)
-        total_questions = len(questions)
-        
-        # Conduct Q&A
-        for i, question in enumerate(questions, 1):
-            answer = self.ask_question(question, i, total_questions)
+        # Adaptive questioning - generate each question based on previous answers
+        max_questions = 5
+        for question_num in range(1, max_questions + 1):
+            # Generate next question based on request and previous answers
+            question = self.generate_next_question(user_request, execution_context, question_num, max_questions)
+            
+            if not question:  # No more relevant questions
+                break
+                
+            answer = self.ask_question(question, question_num, max_questions)
             self.qa_history.append((question, answer))
             
             if answer == "Interrupted":
+                break
+            
+            # Check if we have enough context to stop early
+            if self.has_sufficient_context():
+                print(f"\n✅ Sufficient context gathered after {question_num} questions.")
                 break
         
         # Synthesize context
@@ -120,92 +394,73 @@ class OperatorDialogue:
             tech_background = f"Experienced with {', '.join(mentioned_tech)}"
         
         # Project context
-        project_context = "General request"
-        if "learning" in all_answers or "learn" in all_answers:
-            project_context = "Learning/Educational"
-        elif "production" in all_answers:
+        project_context = "Unknown"
+        if any(word in all_answers for word in ['production', 'work', 'company', 'business']):
             project_context = "Production/Professional"
-        elif "personal" in all_answers:
-            project_context = "Personal Project"
-        elif "work" in all_answers:
-            project_context = "Work/Professional"
+        elif any(word in all_answers for word in ['learn', 'study', 'practice', 'tutorial']):
+            project_context = "Learning/Educational"
+        elif any(word in all_answers for word in ['personal', 'hobby', 'side']):
+            project_context = "Personal/Hobby"
         
         # Complexity preference
-        complexity_pref = "Moderate"
-        if any(word in all_answers for word in ['simple', 'basic', 'minimal', 'easy']):
-            complexity_pref = "Simple/Minimal"
-        elif any(word in all_answers for word in ['robust', 'production', 'comprehensive', 'solid']):
-            complexity_pref = "Robust/Comprehensive"
-        elif any(word in all_answers for word in ['enterprise', 'scalable', 'advanced']):
-            complexity_pref = "Advanced/Enterprise"
+        complexity_preference = "Unknown"
+        if any(word in all_answers for word in ['simple', 'basic', 'minimal', 'quick']):
+            complexity_preference = "Simple/Minimal"
+        elif any(word in all_answers for word in ['robust', 'production', 'enterprise', 'scalable']):
+            complexity_preference = "Robust/Production"
         
-        # Build context summary
-        qa_summary = "\n".join([f"Q: {q}\nA: {a}" for q, a in self.qa_history])
-        
-        # Identify unstated needs
+        # Generate unstated needs
         unstated_needs = []
-        if any(word in user_request.lower() for word in ['user', 'auth', 'login']):
-            if "auth" not in all_answers and "authentication" not in all_answers:
-                unstated_needs.append("Likely needs authentication system")
-        if any(word in user_request.lower() for word in ['api', 'data']):
-            if "database" not in all_answers and "storage" not in all_answers:
-                unstated_needs.append("Probably needs data persistence")
-        if "production" in all_answers and "test" not in all_answers:
-            unstated_needs.append("Should include testing strategy")
+        if 'api' in user_request.lower() or 'web' in user_request.lower():
+            unstated_needs.append("Probably needs data persistence")
+            if 'production' in project_context.lower():
+                unstated_needs.append("Should include testing strategy")
         
-        # Create enhanced request
-        enhanced_request = f"{user_request}\n\nOPERATOR CONTEXT: {project_context} with {complexity_pref.lower()} approach"
-        if tech_background != "Unknown":
-            enhanced_request += f", using {tech_background.lower()}"
+        unstated_needs_text = "; ".join(unstated_needs) if unstated_needs else "None identified"
+        
+        # Create dialogue summary
+        qa_dialogue = "\n".join([f"Q: {q}\nA: {a}" for q, a in self.qa_history])
+        
+        # Display operator profile
+        print(f"\n📊 OPERATOR PROFILE:")
+        print(f"   Technical Background: {tech_background}")
+        print(f"   Project Context: {project_context}")
+        print(f"   Complexity Preference: {complexity_preference}")
         if unstated_needs:
-            enhanced_request += f". Consider: {'; '.join(unstated_needs)}"
+            print(f"   Unstated Needs: {unstated_needs_text}")
         
-        context = {
+        # Enhanced request
+        enhanced_request = user_request
+        
+        # Operator context summary
+        operator_context = f"Operator Profile: {tech_background} developer working on {project_context.lower()} with {complexity_preference.lower()} requirements. {len(unstated_needs)} unstated needs identified."
+        
+        return {
             'original_request': user_request,
             'execution_context': execution_context,
             'technical_background': tech_background,
             'project_context': project_context,
-            'complexity_preference': complexity_pref,
-            'qa_dialogue': qa_summary,
-            'unstated_needs': '; '.join(unstated_needs) if unstated_needs else 'None identified',
+            'complexity_preference': complexity_preference,
+            'qa_dialogue': qa_dialogue,
+            'unstated_needs': unstated_needs_text,
             'enhanced_request': enhanced_request,
-            'operator_context': f"Operator Profile: {tech_background} developer working on {project_context.lower()} with {complexity_pref.lower()} requirements. {len(unstated_needs)} unstated needs identified."
+            'operator_context': operator_context
         }
-        
-        # Display synthesis
-        print(f"\n📊 OPERATOR PROFILE:")
-        print(f"   Technical Background: {tech_background}")
-        print(f"   Project Context: {project_context}")
-        print(f"   Complexity Preference: {complexity_pref}")
-        if unstated_needs:
-            print(f"   Unstated Needs: {'; '.join(unstated_needs)}")
-        
-        return context
 
 
-def conduct_operator_dialogue(user_request: str, execution_context: str = "") -> Dict[str, str]:
-    """
-    Main function to conduct operator dialogue and return context
-    
-    Args:
-        user_request: The user's original request
-        execution_context: Context about where the command was executed
-        
-    Returns:
-        Dict containing comprehensive operator context
-    """
+def conduct_operator_dialogue(user_request: str, execution_context: str) -> Dict[str, str]:
+    """Main entry point for conducting operator dialogue"""
     dialogue = OperatorDialogue()
     return dialogue.conduct_dialogue(user_request, execution_context)
 
 
 if __name__ == "__main__":
-    # Test the dialogue system
     if len(sys.argv) > 1:
         request = " ".join(sys.argv[1:])
+        context = conduct_operator_dialogue(request, "CLI test environment")
+        print("\n" + "="*60)
+        print("FINAL CONTEXT:")
+        for key, value in context.items():
+            print(f"{key}: {value}")
     else:
-        request = "Create a REST API for user management"
-    
-    context = conduct_operator_dialogue(request, "CLI test")
-    print("\nFinal Context:")
-    for key, value in context.items():
-        print(f"{key}: {value}")
+        print("Usage: python interactive_dialogue.py 'Your request here'")
