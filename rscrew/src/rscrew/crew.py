@@ -16,9 +16,13 @@ def debug_print(message):
     if DEBUG_MODE:
         print(f"[DEBUG] {message}")
 
-# Set up logging for CrewAI internals
+# Set up logging for CrewAI internals (but suppress verbose LiteLLM logs)
 if DEBUG_MODE:
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)  # Changed from DEBUG to INFO
+    # Suppress verbose LiteLLM logging
+    logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     debug_print("Debug mode enabled")
 
 # Debug: Check environment variables
@@ -57,24 +61,18 @@ class Rscrew():
     def researcher(self) -> Agent:
         debug_print("=== Creating Researcher Agent ===")
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        debug_print(f"API Key available: {bool(api_key)}")
-        debug_print(f"API Key length: {len(api_key) if api_key else 0}")
         
         try:
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-            debug_print(f"LLM created successfully: {llm.model}")
-            debug_print(f"LLM provider: {getattr(llm, 'provider', 'unknown')}")
-            debug_print(f"LLM class: {type(llm).__name__}")
+            debug_print(f"LLM created: {llm.model}")
         except Exception as e:
             debug_print(f"ERROR creating LLM: {e}")
             llm = None
         
-        debug_print(f"Researcher LLM: {llm.model if llm else 'None'}")
-        
         # Test LLM directly
         if llm and DEBUG_MODE:
             try:
-                debug_print("Testing LLM with simple call...")
+                debug_print("Testing LLM...")
                 test_response = llm.call("Say 'test successful'")
                 debug_print(f"LLM test response: {test_response}")
             except Exception as e:
@@ -96,19 +94,14 @@ class Rscrew():
     def reporting_analyst(self) -> Agent:
         debug_print("=== Creating Reporting Analyst Agent ===")
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        debug_print(f"API Key available: {bool(api_key)}")
-        debug_print(f"API Key length: {len(api_key) if api_key else 0}")
         
         try:
             llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-            debug_print(f"LLM created successfully: {llm.model}")
-            debug_print(f"LLM provider: {getattr(llm, 'provider', 'unknown')}")
-            debug_print(f"LLM class: {type(llm).__name__}")
+            debug_print(f"LLM created: {llm.model}")
         except Exception as e:
             debug_print(f"ERROR creating LLM: {e}")
             llm = None
         
-        debug_print(f"Reporting Analyst LLM: {llm.model if llm else 'None'}")
         debug_print("========================================")
         
         agent = Agent(
