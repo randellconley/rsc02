@@ -574,14 +574,20 @@ class Rscrew():
         
         # Enhance inputs with operator context
         enhanced_inputs = {
-            **inputs,  # Keep original inputs
+            **inputs,  # Keep original inputs (topic, current_year, execution_context)
             'topic': operator_context['enhanced_request'],  # Use enhanced request
             'operator_context': operator_context['operator_context'],
             'technical_background': operator_context['technical_background'],
             'project_context': operator_context['project_context'],
             'complexity_preference': operator_context['complexity_preference'],
             'qa_dialogue': operator_context['qa_dialogue'],
-            'unstated_needs': operator_context['unstated_needs']
+            'unstated_needs': operator_context['unstated_needs'],
+            # Default values for plan-based template variables (not used in default mode)
+            'implementation_plan': 'No specific implementation plan provided. Proceed with analysis and solution development based on the request.',
+            'current_plan': 'No existing plan available. This is a new request.',
+            'user_request': operator_context['enhanced_request'],  # Same as topic for consistency
+            'change_type': 'new_request',  # Default change type for new requests
+            'assessment_results': 'No prior assessment available. Proceed with fresh analysis.'
         }
         
         debug_print(f"Enhanced inputs: {list(enhanced_inputs.keys())}")
