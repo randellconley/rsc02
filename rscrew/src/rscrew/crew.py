@@ -14,8 +14,8 @@ RSCREW_VERSION = "v2.2-simplified"
 RSCREW_FEATURES = ["null-response-handling", "debug-monitoring"]
 RSCREW_COMMIT = "simplified"  # Simplified version without retry logic
 
-# Debug toggle - set to False to disable debug output
-DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
+# Debug toggle - only enabled when explicitly set to 'true'
+DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'false').lower() == 'true'
 
 def debug_print(message):
     if DEBUG_MODE:
