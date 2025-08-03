@@ -329,10 +329,15 @@ class InteractivePlanSession:
                 updated_plan = self.current_plan + f"\n\n<!-- Change applied: {user_request} -->"
                 self.add_change(user_request, updated_plan)
                 print("✅ Plan updated.")
-                return True
             else:
                 print("❌ Changes discarded.")
-                return False
+            
+            # Ask if user wants to make another update
+            another_update = input("\nWould you like to make another update? (y/n): ").strip().lower()
+            if another_update == 'y':
+                return True  # Continue with another update
+            else:
+                return False  # Exit update process
                 
         except Exception as e:
             print(f"❌ Error processing request: {e}")
@@ -378,7 +383,14 @@ class InteractivePlanSession:
                     
                 else:
                     # Process update request
-                    self.process_update_request(user_input)
+                    continue_session = self.process_update_request(user_input)
+                    if not continue_session:
+                        # User chose not to make another update, save and exit
+                        self.plan_manager.save_plan(self.current_plan, self.plan_path)
+                        print(f"💾 Saving final plan to {self.plan_path}")
+                        print(f"📊 Session summary: {len(self.change_history)} changes applied")
+                        print("✨ Session complete.")
+                        break
                     
             except KeyboardInterrupt:
                 print("\n\n⚠️  Session interrupted. Type 'done' to save or 'cancel' to exit without saving.")
