@@ -488,8 +488,9 @@ def run_test_with_progress(cmd, test_name, timeout=600, verbose=False, debug=Fal
     if verbose:
         console.print(f"[bold blue]Starting {test_name} test...[/bold blue]")
     
-    # Set up environment for debug mode
+    # Set up environment for debug mode and test mode
     env = os.environ.copy()
+    env['RSCREW_TEST_MODE'] = 'true'  # Enable test mode for automated responses
     if debug:
         env['RSCREW_DEBUG'] = 'true'
         console.print(f"[dim][DEBUG] Environment: RSCREW_DEBUG=true[/dim]")
@@ -676,13 +677,18 @@ def run_single_test(test_name, timeout=600, verbose=False, debug=False):
         else:
             # Use simple progress with spinner
             try:
+                # Set up environment for test mode
+                env = os.environ.copy()
+                env['RSCREW_TEST_MODE'] = 'true'  # Enable test mode for automated responses
+                
                 with console.status(f"Running {test_name} test...", spinner="dots"):
                     result = subprocess.run(
                         cmd,
                         capture_output=True,
                         text=True,
                         timeout=timeout,
-                        cwd=test_dir
+                        cwd=test_dir,
+                        env=env
                     )
                 
                 duration = time.time() - start_time

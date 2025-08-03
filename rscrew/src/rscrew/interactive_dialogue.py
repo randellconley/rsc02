@@ -7,6 +7,7 @@ using cached domain patterns for known domains and dynamic generation for novel 
 
 import sys
 import re
+import os
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 
@@ -319,9 +320,43 @@ class OperatorDialogue:
         
         return covered_areas >= 2 or len(self.qa_history) >= 4
     
+    def _get_test_mode_answer(self, question: str, question_num: int) -> str:
+        """Generate appropriate default answers for test mode"""
+        question_lower = question.lower()
+        
+        # Provide context-aware default answers based on question content
+        if 'aspect' in question_lower or 'focus' in question_lower:
+            return "Overall structure and organization"
+        elif 'technical' in question_lower or 'experience' in question_lower:
+            return "Intermediate - familiar with common tools and practices"
+        elif 'project' in question_lower or 'context' in question_lower:
+            return "Development project requiring analysis and documentation"
+        elif 'complexity' in question_lower or 'approach' in question_lower:
+            return "Balanced approach with clear explanations"
+        elif 'timeline' in question_lower or 'urgency' in question_lower:
+            return "Standard timeline, quality over speed"
+        else:
+            # Generic fallback answers
+            fallback_answers = [
+                "Standard approach",
+                "No specific preference", 
+                "Balanced solution",
+                "Default configuration",
+                "Standard requirements"
+            ]
+            return fallback_answers[(question_num - 1) % len(fallback_answers)]
+    
     def ask_question(self, question: str, question_num: int, total_questions: int) -> str:
         """Ask a single question and get user response"""
         print(f"\n**Question {question_num}/{total_questions}**: {question}")
+        
+        # Check if we're in test mode
+        if os.getenv('RSCREW_TEST_MODE') == 'true':
+            # Provide sensible default answers for testing
+            default_answer = self._get_test_mode_answer(question, question_num)
+            print(f"Your answer: {default_answer} [TEST MODE - AUTO RESPONSE]")
+            return default_answer
+        
         print("Your answer: ", end="", flush=True)
         
         try:
