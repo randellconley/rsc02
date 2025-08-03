@@ -849,7 +849,7 @@ def run():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Testing Commands:
-  rc -test                                     Run basic direct prompt test (default)
+  rc -test                                     Run quick test (default - math question)
   rc -test quick                              Run ultra-fast simple test (math question)
   rc -test simple                             Run medium complexity test (Python explanation)
   rc -test basic                              Run complex test (directory analysis)
@@ -908,7 +908,7 @@ Examples:
     parser.add_argument(
         '-test',
         nargs='?',
-        const='basic',
+        const='quick',
         help='Run test commands: quick, simple, basic, plan, build, update, file, all'
     )
     
