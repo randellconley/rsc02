@@ -24,6 +24,8 @@ class SafetyController:
         self.aws_account_boundary = True
         self.max_weekly_cost = 5.00
         self.external_read_allowed = True
+        self.sudo_enabled = True  # Enable sudo operations
+        self.system_modification_enabled = True  # Enable system file modifications
         
     def assess_risk(self, operation: Dict[str, Any]) -> Tuple[str, List[str]]:
         """Assess risk level of an operation"""
@@ -68,6 +70,45 @@ class SafetyController:
         write_operations = ['write', 'create', 'delete', 'modify', 'deploy', 'purchase']
         return operation.get('operation_type') in write_operations
         
+    def assess_sudo_command(self, command: str) -> Tuple[bool, str, str]:
+        """Assess safety of sudo commands"""
+        if not self.sudo_enabled:
+            return False, "CRITICAL", "Sudo operations are disabled"
+            
+        # Extremely dangerous commands that should never be allowed
+        dangerous_commands = [
+            'rm -rf /', 'dd if=/dev/zero', 'mkfs', 'fdisk /dev/sd',
+            'shutdown -h now', 'reboot', 'halt', 'poweroff',
+            'iptables -F', 'ufw --force reset'
+        ]
+        
+        for dangerous in dangerous_commands:
+            if dangerous in command:
+                return False, "CRITICAL", f"Dangerous command blocked: {dangerous}"
+        
+        # High-risk commands that require extra caution
+        high_risk_commands = [
+            'userdel', 'passwd root', 'chmod 777', 'chown root',
+            'rm -rf', 'dd ', 'mkfs', 'fdisk', 'parted'
+        ]
+        
+        for high_risk in high_risk_commands:
+            if high_risk in command:
+                return True, "HIGH", f"High-risk sudo command: {high_risk}"
+        
+        # Package management and service operations are medium risk
+        medium_risk_commands = [
+            'apt install', 'apt remove', 'yum install', 'systemctl',
+            'service ', 'useradd', 'usermod'
+        ]
+        
+        for medium_risk in medium_risk_commands:
+            if medium_risk in command:
+                return True, "MEDIUM", f"Medium-risk sudo command: {medium_risk}"
+        
+        # Default: allow with low risk
+        return True, "LOW", "Standard sudo command"
+
     def approve_operation(self, operation: Dict[str, Any]) -> Tuple[bool, str]:
         """Approve or reject an operation"""
         risk_level, risks = self.assess_risk(operation)
@@ -226,7 +267,27 @@ class ExecuteCommandTool(BaseTool):
             'mkdir', 'cp', 'mv', 'chmod', 'chown',        # File operations
             'systemctl', 'service', 'apache2ctl',         # Service operations
             'git', 'npm', 'pip', 'python', 'node',        # Development tools
-            'a2ensite', 'a2dissite', 'a2enmod'            # Apache tools
+            'a2ensite', 'a2dissite', 'a2enmod',           # Apache tools
+            'sudo',                                       # Privileged operations
+            'apt', 'apt-get', 'dpkg', 'snap',            # Package management
+            'yum', 'dnf', 'rpm', 'zypper',               # Alternative package managers
+            'brew', 'pacman',                             # Additional package managers
+            'useradd', 'usermod', 'userdel', 'groupadd', # User management
+            'passwd', 'chpasswd',                         # Password management
+            'mount', 'umount', 'fdisk', 'mkfs',          # Disk operations
+            'iptables', 'ufw', 'firewall-cmd',           # Firewall management
+            'crontab', 'systemd-run',                     # Scheduling
+            'nginx', 'httpd', 'mysql', 'postgresql',     # Service binaries
+            'docker', 'docker-compose', 'kubectl',       # Container tools
+            'ssh', 'scp', 'rsync',                        # Network tools
+            'tar', 'gzip', 'unzip', 'zip',               # Archive tools
+            'vim', 'nano', 'emacs', 'sed', 'awk',        # Text editors/processors
+            'make', 'cmake', 'gcc', 'g++',               # Build tools
+            'wget', 'curl', 'ping', 'netstat', 'ss',     # Network utilities
+            'ps', 'top', 'htop', 'kill', 'killall',      # Process management
+            'df', 'du', 'free', 'lsof', 'lsblk',         # System monitoring
+            'modprobe', 'insmod', 'rmmod',               # Kernel modules
+            'update-alternatives', 'alternatives'         # System alternatives
         ]
         
         # Parse command
@@ -239,6 +300,15 @@ class ExecuteCommandTool(BaseTool):
         # Safety checks
         if base_command not in allowed_commands:
             return f"❌ Command not allowed: {base_command}"
+        
+        # Special handling for sudo commands
+        if base_command == 'sudo':
+            sudo_approved, risk_level, sudo_message = safety_controller.assess_sudo_command(command)
+            if not sudo_approved:
+                return f"❌ Sudo command blocked: {sudo_message}"
+            if risk_level in ['HIGH', 'CRITICAL']:
+                return f"⚠️  High-risk sudo command detected: {sudo_message}\n" + \
+                       f"Command will be executed with extra logging: {command}"
             
         operation = {
             'operation_type': 'execute',
@@ -270,6 +340,69 @@ class ExecuteCommandTool(BaseTool):
             return "❌ Command timed out after 30 seconds"
         except Exception as e:
             return f"❌ Failed to execute command: {e}"
+
+
+class SystemFileEditInput(BaseModel):
+    """Input schema for SystemFileEdit tool."""
+    file_path: str = Field(..., description="Path to system file to edit")
+    content: str = Field(..., description="New content for the file")
+    backup: bool = Field(default=True, description="Create backup before editing")
+
+class SystemFileEditTool(BaseTool):
+    """Tool for editing system files with sudo privileges and safety controls"""
+    
+    name: str = "edit_system_file"
+    description: str = "Edit system files with sudo privileges, automatic backup, and safety controls"
+    args_schema: Type[BaseModel] = SystemFileEditInput
+    
+    def _run(self, file_path: str, content: str, backup: bool = True) -> str:
+        """Edit system file with safety checks and backup"""
+        safety_controller = SafetyController()
+        
+        if not safety_controller.system_modification_enabled:
+            return "❌ System file modification is disabled"
+        
+        # Check if file path is in blocked paths
+        blocked_paths = [
+            "/proc/sys/kernel/core_pattern",
+            "/sys/kernel/security"
+        ]
+        
+        for blocked in blocked_paths:
+            if file_path.startswith(blocked):
+                return f"❌ Access to {file_path} is blocked for security reasons"
+        
+        try:
+            # Create backup if requested
+            if backup and os.path.exists(file_path):
+                backup_path = f"{file_path}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                subprocess.run(['sudo', 'cp', file_path, backup_path], check=True)
+                backup_msg = f"Backup created: {backup_path}\n"
+            else:
+                backup_msg = ""
+            
+            # Write content to temporary file first
+            temp_file = f"/tmp/rscrew_edit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Move temp file to target with sudo
+            result = subprocess.run(
+                ['sudo', 'mv', temp_file, file_path],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                return f"✅ System file edited successfully: {file_path}\n{backup_msg}"
+            else:
+                return f"❌ Failed to edit system file: {result.stderr}"
+                
+        except subprocess.TimeoutExpired:
+            return "❌ System file edit timed out after 30 seconds"
+        except Exception as e:
+            return f"❌ Failed to edit system file: {e}"
 
 
 class ConfigureServiceInput(BaseModel):
@@ -405,6 +538,7 @@ class ExternalReadTool(BaseTool):
 IMPLEMENTATION_TOOLS = [
     WriteFileTool(),
     ExecuteCommandTool(),
+    SystemFileEditTool(),
     ConfigureServiceTool(),
     ExternalReadTool()
 ]

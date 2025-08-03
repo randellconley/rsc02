@@ -39,6 +39,10 @@ agent_default_permissions:
     - api_calls
     - system_admin
     - service_restart
+    - sudo_access
+    - package_management
+    - user_management
+    - system_modification
     
   quality_assurance:
     - read
@@ -112,6 +116,26 @@ permission_definitions:
     description: "System administration tasks"
     tools: ["install_package", "modify_system_config"]
     risk_level: "HIGH"
+    
+  sudo_access:
+    description: "Execute commands with sudo privileges"
+    tools: ["sudo_command"]
+    risk_level: "CRITICAL"
+    
+  package_management:
+    description: "Install, update, and remove system packages"
+    tools: ["apt_install", "yum_install", "package_manager"]
+    risk_level: "HIGH"
+    
+  user_management:
+    description: "Create, modify, and delete system users"
+    tools: ["useradd", "usermod", "userdel", "passwd"]
+    risk_level: "CRITICAL"
+    
+  system_modification:
+    description: "Modify core system files and configurations"
+    tools: ["edit_system_config", "modify_system_files"]
+    risk_level: "CRITICAL"
 
 # User permission overrides (can be modified by user)
 user_permission_overrides:
@@ -168,7 +192,10 @@ safety_settings:
     - ".config"
     
   blocked_paths:
-    - "/etc/passwd"
-    - "/etc/shadow"
-    - "/root"
-    - "/home/*/.*ssh*"
+    # Critical system files that should still be protected
+    - "/proc/sys/kernel/core_pattern"
+    - "/sys/kernel/security"
+    # SSH keys remain protected unless explicitly needed
+    - "/home/*/.*ssh*/id_*"
+    - "/root/.ssh/id_*"
+    # Note: /etc/passwd, /etc/shadow, /root now accessible with sudo
