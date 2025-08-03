@@ -70,33 +70,79 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
         }
     
     # EMPHASIZE: If prompt is ALL questions, classify as INFORMATION
-    # Split into sentences and check if ALL are questions
+    # If prompt is ALL action statements, classify as IMPLEMENTATION
+    # Split into sentences and also handle compound sentences with 'and'
     import re
     sentences = re.split(r'[.!?]+', request_lower)
     sentences = [s.strip() for s in sentences if s.strip()]
     
-    if sentences:
+    # Further split compound sentences connected by 'and' to handle mixed intents
+    expanded_parts = []
+    for sentence in sentences:
+        # Split on 'and' but preserve context
+        parts = re.split(r'\s+and\s+', sentence)
+        if len(parts) > 1:
+            # Check if this creates meaningful separate parts
+            for part in parts:
+                part = part.strip()
+                if len(part) > 3:  # Ignore very short parts
+                    expanded_parts.append(part)
+        else:
+            expanded_parts.append(sentence)
+    
+    if expanded_parts:
         question_words = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can you', 'could you', 'would you', 'do you', 'is there', 'are there']
+        action_words = ['build', 'create', 'develop', 'implement', 'code', 'write', 'program', 'make', 'construct', 'design']
         
         all_questions = True
-        for sentence in sentences:
-            # Check if sentence is a question (starts with question word or ends with ?)
-            is_question = (
-                any(sentence.startswith(qw) for qw in question_words) or
-                sentence.endswith('?') or
-                any(qw in sentence for qw in ['what', 'how', 'why', 'when', 'where', 'who', 'which'])
-            )
-            if not is_question:
-                all_questions = False
-                break
+        all_actions = True
+        question_count = 0
+        action_count = 0
         
-        # Only classify as INFORMATION if ALL sentences are questions
-        if all_questions and len(sentences) > 0:
+        for part in expanded_parts:
+            part = part.strip()
+            if len(part) > 0:
+                # Check if part is a question
+                is_question = (
+                    any(part.startswith(qw) for qw in question_words) or
+                    part.endswith('?') or
+                    '?' in part or
+                    any(qw in part for qw in ['what', 'how', 'why', 'when', 'where', 'who', 'which'])
+                )
+                
+                # Check if part is an action/command
+                is_action = (
+                    any(part.startswith(aw) for aw in action_words) or
+                    any(keyword in part for keyword in ['build me', 'create a', 'develop a', 'implement a', 'write a', 'make a', 'code a'])
+                )
+                
+                if is_question:
+                    question_count += 1
+                    all_actions = False
+                elif is_action:
+                    action_count += 1
+                    all_questions = False
+                else:
+                    # Neither clear question nor clear action
+                    all_questions = False
+                    all_actions = False
+        
+        # Only classify as INFORMATION if ALL parts are questions
+        if all_questions and question_count > 0:
             return {
                 "intent": "INFORMATION",
                 "confidence": "High 0.85",
                 "workflow": "Quick Response",
                 "reasoning": "All sentences are questions - classified as information request"
+            }
+        
+        # Only classify as IMPLEMENTATION if ALL parts are action statements
+        if all_actions and action_count > 0:
+            return {
+                "intent": "IMPLEMENTATION",
+                "confidence": "High 0.85",
+                "workflow": "Full Development",
+                "reasoning": "All sentences are action statements - classified as implementation request"
             }
     
     # Information request indicators (including analysis, reports, general info gathering)
