@@ -651,6 +651,14 @@ def run_single_test(test_name, timeout=600, verbose=False, debug=False):
             prompt = (assets_dir / "basic_prompt.txt").read_text().strip()
             cmd = ["rc", prompt]
         
+        elif test_name == "simple":
+            prompt = (assets_dir / "simple_prompt.txt").read_text().strip()
+            cmd = ["rc", prompt]
+        
+        elif test_name == "quick":
+            prompt = (assets_dir / "quick_prompt.txt").read_text().strip()
+            cmd = ["rc", prompt]
+        
         elif test_name == "plan":
             prompt = (assets_dir / "plan_prompt.txt").read_text().strip()
             cmd = ["rc", "-plan", prompt, "-name", "test_calc"]
@@ -746,7 +754,7 @@ def run_test_command(test_type=None, details=False, clean=False, verbose=False, 
         return
     
     # Define available tests
-    available_tests = ["basic", "plan", "build", "update", "file"]
+    available_tests = ["quick", "simple", "basic", "plan", "build", "update", "file"]
     
     if test_type and test_type not in available_tests + ["all"]:
         print(f"❌ Unknown test type: {test_type}")

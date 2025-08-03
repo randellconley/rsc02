@@ -1,0 +1,1 @@
+Explain what Python is and list 3 key benefits of using Python for software development.
