@@ -149,26 +149,22 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
     if total_matches > max_matches:  # Mixed signals reduce confidence
         confidence_score *= 0.85
     
-    # Check for nonsense classification threshold (updated to 0.10 per user request)
+    # Check for nonsense classification threshold (updated to 0.20 per prompt 17)
     info_confidence = confidence_score if info_matches == max_matches else confidence_score * 0.5
     build_confidence = confidence_score if implementation_matches == max_matches else confidence_score * 0.5
     
-    if info_confidence < 0.10 and build_confidence < 0.10:
+    if info_confidence < 0.20 and build_confidence < 0.20:
         return {
             "intent": "NONSENSE",
             "confidence": f"Low {max(info_confidence, build_confidence):.2f}",
             "workflow": "No Action",
-            "reasoning": "Both info and build confidence below 0.10 threshold"
+            "reasoning": "Both info and build confidence below 0.20 threshold"
         }
     
-    # Determine intent with updated logic (information confidence limit 0.60, nonsense 0.10)
+    # Determine intent with updated logic per prompt 17
     if info_matches > planning_matches and info_matches > implementation_matches:
         intent = "INFORMATION"
-        # Apply 0.60 confidence limit for information requests
-        if confidence_score >= 0.60:
-            confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
-        else:
-            confidence = f"Low {confidence_score:.2f}"
+        confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
         workflow = "Quick Response"
         reasoning = f"Request contains {info_matches} information-seeking keywords"
     elif planning_matches > implementation_matches:
@@ -177,12 +173,17 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
         workflow = "Strategic Planning"
         reasoning = f"Request contains {planning_matches} planning/strategy keywords"
     elif implementation_matches > 0:
-        # Apply 0.7 threshold rule for implementation
-        if confidence_score < 0.7:
+        # Apply new logic: implementation confidence below 0.6 → INFORMATION, below 0.2 → NONSENSE
+        if build_confidence < 0.20:
+            intent = "NONSENSE"
+            confidence = f"Low {build_confidence:.2f}"
+            workflow = "No Action"
+            reasoning = f"Implementation confidence {build_confidence:.2f} below 0.20 threshold, classified as nonsense"
+        elif build_confidence < 0.60:
             intent = "INFORMATION"
-            confidence = f"Medium {confidence_score:.2f}"
+            confidence = f"Medium {build_confidence:.2f}"
             workflow = "Quick Response"
-            reasoning = f"Implementation confidence {confidence_score:.2f} below 0.7 threshold, defaulting to INFORMATION"
+            reasoning = f"Implementation confidence {build_confidence:.2f} below 0.60 threshold, defaulting to INFORMATION"
         else:
             intent = "IMPLEMENTATION"
             confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
