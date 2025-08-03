@@ -1,0 +1,118 @@
+global_settings:
+  rate_limiting:
+    enabled: true
+    min_interval: 0.5
+  fallback_enabled: true
+  debug_mode: true
+providers:
+  claude:
+    model: claude-3-5-sonnet-20241022
+    api_key_env: ANTHROPIC_API_KEY
+    description: Best for complex reasoning, code generation, and strategic planning
+    cost_tier: premium
+  gemini:
+    model: gemini-1.5-pro
+    api_key_env: GEMINI_API_KEY
+    description: Excellent for information processing and analysis
+    cost_tier: standard
+  openai:
+    model: gpt-4o
+    api_key_env: OPENAI_API_KEY
+    description: Strong general-purpose model with good reasoning
+    cost_tier: premium
+  deepseek:
+    model: deepseek-chat
+    api_key_env: DEEPSEEK_API_KEY
+    description: Cost-effective model good for coding and technical tasks
+    cost_tier: budget
+agent_assignments:
+  project_orchestrator:
+    primary: claude
+    secondary: openai
+    tertiary: gemini
+    fallback: deepseek
+    reasoning: Strategic planning requires top-tier reasoning
+  solution_architect:
+    primary: claude
+    secondary: openai
+    tertiary: deepseek
+    fallback: gemini
+    reasoning: Architecture decisions need strong technical reasoning
+  code_implementer:
+    primary: openai
+    secondary: claude
+    tertiary: openai
+    fallback: gemini
+    reasoning: Testing OpenAI for code generation
+  quality_assurance:
+    primary: openai
+    secondary: claude
+    tertiary: deepseek
+    fallback: gemini
+    reasoning: OpenAI good for testing strategy and validation
+  plan_update_coordinator:
+    primary: claude
+    secondary: openai
+    tertiary: gemini
+    fallback: deepseek
+    reasoning: Plan synthesis requires strong reasoning
+  operator_intent_interpreter:
+    primary: gemini
+    secondary: openai
+    tertiary: claude
+    fallback: deepseek
+    reasoning: Gemini excellent for request analysis
+  research_analyst:
+    primary: gemini
+    secondary: openai
+    tertiary: deepseek
+    fallback: claude
+    reasoning: Information gathering and research
+  technical_writer:
+    primary: openai
+    secondary: gemini
+    tertiary: claude
+    fallback: deepseek
+    reasoning: OpenAI strong for documentation and communication
+  security_architecture_specialist:
+    primary: claude
+    secondary: openai
+    tertiary: deepseek
+    fallback: gemini
+    reasoning: Security requires careful reasoning and analysis
+  database_architecture_specialist:
+    primary: deepseek
+    secondary: claude
+    tertiary: openai
+    fallback: gemini
+    reasoning: DeepSeek good for technical database design
+  frontend_architecture_specialist:
+    primary: openai
+    secondary: deepseek
+    tertiary: gemini
+    fallback: claude
+    reasoning: UI/UX and frontend patterns
+  infrastructure_specialist:
+    primary: deepseek
+    secondary: openai
+    tertiary: claude
+    fallback: gemini
+    reasoning: DevOps and infrastructure automation
+  feature_analyst:
+    primary: gemini
+    secondary: openai
+    tertiary: deepseek
+    fallback: claude
+    reasoning: Feature analysis and requirements gathering
+load_balancing:
+  strategy: priority_based
+  distribution:
+    claude: 4
+    openai: 4
+    gemini: 3
+    deepseek: 2
+cost_optimization:
+  enabled: true
+  prefer_budget_models: false
+  max_premium_calls_per_hour: 100
+  fallback_to_budget: true
