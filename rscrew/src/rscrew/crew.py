@@ -1127,7 +1127,9 @@ class Rscrew():
         }
         
         try:
-            result = assessment_task.execute(context=inputs)
+            # Convert inputs dict to context string for execute_sync
+            context_str = f"Current Plan: {inputs['current_plan']}\nUser Request: {inputs['user_request']}\nChange Type: {inputs['change_type']}"
+            result = assessment_task.execute_sync(agent=agent, context=context_str)
             return self.parse_assessment_result(result.raw if hasattr(result, 'raw') else str(result))
         except Exception as e:
             debug_print(f"Error in assessment: {e}")
