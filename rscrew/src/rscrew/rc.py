@@ -57,26 +57,44 @@ def classify_request_intent(user_request: str, execution_context: str) -> Dict[s
     planning_matches = sum(1 for keyword in planning_keywords if keyword in request_lower)
     implementation_matches = sum(1 for keyword in implementation_keywords if keyword in request_lower)
     
+    # Calculate confidence scores (0.0 to 1.0)
+    total_matches = info_matches + planning_matches + implementation_matches
+    max_matches = max(info_matches, planning_matches, implementation_matches)
+    
+    # Base confidence calculation
+    if max_matches == 0:
+        confidence_score = 0.3  # Low confidence for unclear requests
+    elif max_matches == 1:
+        confidence_score = 0.65  # Medium confidence for single match
+    elif max_matches == 2:
+        confidence_score = 0.8   # High confidence for double match
+    else:
+        confidence_score = 0.9   # Very high confidence for multiple matches
+    
+    # Adjust confidence based on competing signals
+    if total_matches > max_matches:  # Mixed signals reduce confidence
+        confidence_score *= 0.85
+    
     # Determine intent
     if info_matches > planning_matches and info_matches > implementation_matches:
         intent = "INFORMATION"
-        confidence = "High" if info_matches >= 2 else "Medium"
+        confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
         workflow = "Quick Response"
         reasoning = f"Request contains {info_matches} information-seeking keywords"
     elif planning_matches > implementation_matches:
         intent = "PLANNING"
-        confidence = "High" if planning_matches >= 2 else "Medium"
+        confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
         workflow = "Strategic Planning"
         reasoning = f"Request contains {planning_matches} planning/strategy keywords"
     elif implementation_matches > 0:
         intent = "IMPLEMENTATION"
-        confidence = "High" if implementation_matches >= 2 else "Medium"
+        confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
         workflow = "Full Development"
         reasoning = f"Request contains {implementation_matches} implementation keywords"
     else:
         # Default to information for unclear requests
         intent = "INFORMATION"
-        confidence = "Low"
+        confidence = f"Low {confidence_score:.2f}"
         workflow = "Quick Response"
         reasoning = "No clear intent indicators found, defaulting to information request"
     
