@@ -19,6 +19,15 @@ import shutil
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from rich.console import Console
+from rich.spinner import Spinner
+from rich.live import Live
+from rich.text import Text
+import select
+import fcntl
+
+# Initialize rich console
+console = Console()
 
 def read_prompt_file(file_path):
     """Read prompt from a file."""
@@ -465,7 +474,167 @@ def validate_test_output(test_name, output, duration):
     
     return True, "Test passed validation"
 
-def run_single_test(test_name, timeout=600):
+def run_test_with_progress(cmd, test_name, timeout=600, verbose=False, debug=False):
+    """Run a test command with real-time progress indication and optional verbose/debug output"""
+    start_time = time.time()
+    
+    # Debug mode: show command details
+    if debug:
+        console.print(f"[dim][DEBUG] Command: {' '.join(cmd)}[/dim]")
+        console.print(f"[dim][DEBUG] Working directory: {os.getcwd()}[/dim]")
+        console.print(f"[dim][DEBUG] Timeout: {timeout}s[/dim]")
+    
+    # Verbose mode: show test start
+    if verbose:
+        console.print(f"[bold blue]Starting {test_name} test...[/bold blue]")
+    
+    # Set up environment for debug mode
+    env = os.environ.copy()
+    if debug:
+        env['RSCREW_DEBUG'] = 'true'
+        console.print(f"[dim][DEBUG] Environment: RSCREW_DEBUG=true[/dim]")
+    
+    # Prepare for real-time output capture
+    output_lines = []
+    error_lines = []
+    
+    try:
+        # Start the subprocess
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        if debug:
+            console.print(f"[dim][DEBUG] Process PID: {process.pid}[/dim]")
+        
+        # Create spinner for progress indication
+        spinner_text = f"Running {test_name} test..."
+        
+        def update_spinner_text(elapsed):
+            return f"Running {test_name} test... ({elapsed:.0f}s elapsed)"
+        
+        # Real-time output processing
+        with Live(console=console, refresh_per_second=4) as live:
+            spinner = Spinner("dots", text=spinner_text)
+            live.update(spinner)
+            
+            # Make stdout and stderr non-blocking
+            import fcntl
+            fd_stdout = process.stdout.fileno()
+            fd_stderr = process.stderr.fileno()
+            fl_stdout = fcntl.fcntl(fd_stdout, fcntl.F_GETFL)
+            fl_stderr = fcntl.fcntl(fd_stderr, fcntl.F_GETFL)
+            fcntl.fcntl(fd_stdout, fcntl.F_SETFL, fl_stdout | os.O_NONBLOCK)
+            fcntl.fcntl(fd_stderr, fcntl.F_SETFL, fl_stderr | os.O_NONBLOCK)
+            
+            while process.poll() is None:
+                elapsed = time.time() - start_time
+                
+                # Check for timeout
+                if elapsed > timeout:
+                    process.terminate()
+                    process.wait(timeout=5)
+                    return TestResult(test_name, False, elapsed, "", f"Test timed out after {timeout} seconds")
+                
+                # Update spinner with elapsed time
+                spinner.text = update_spinner_text(elapsed)
+                live.update(spinner)
+                
+                # Read available output
+                try:
+                    stdout_data = process.stdout.read()
+                    if stdout_data:
+                        lines = stdout_data.split('\n')
+                        for line in lines:
+                            if line.strip():
+                                output_lines.append(line)
+                                if verbose:
+                                    console.print(f"[dim]  {line}[/dim]")
+                                elif debug:
+                                    console.print(f"[dim][OUT] {line}[/dim]")
+                except:
+                    pass
+                
+                try:
+                    stderr_data = process.stderr.read()
+                    if stderr_data:
+                        lines = stderr_data.split('\n')
+                        for line in lines:
+                            if line.strip():
+                                error_lines.append(line)
+                                if verbose:
+                                    console.print(f"[dim red]  {line}[/dim red]")
+                                elif debug:
+                                    console.print(f"[dim red][ERR] {line}[/dim red]")
+                except:
+                    pass
+                
+                time.sleep(0.1)
+            
+            # Final read of any remaining output
+            try:
+                remaining_stdout = process.stdout.read()
+                if remaining_stdout:
+                    for line in remaining_stdout.split('\n'):
+                        if line.strip():
+                            output_lines.append(line)
+                            if verbose or debug:
+                                prefix = "[OUT]" if debug else ""
+                                console.print(f"[dim]{prefix} {line}[/dim]")
+            except:
+                pass
+            
+            try:
+                remaining_stderr = process.stderr.read()
+                if remaining_stderr:
+                    for line in remaining_stderr.split('\n'):
+                        if line.strip():
+                            error_lines.append(line)
+                            if verbose or debug:
+                                prefix = "[ERR]" if debug else ""
+                                console.print(f"[dim red]{prefix} {line}[/dim red]")
+            except:
+                pass
+        
+        # Calculate final duration
+        duration = time.time() - start_time
+        
+        # Combine output
+        full_output = '\n'.join(output_lines + error_lines)
+        
+        if debug:
+            console.print(f"[dim][DEBUG] Process completed with exit code: {process.returncode}[/dim]")
+            console.print(f"[dim][DEBUG] Output length: {len(full_output)} characters[/dim]")
+            console.print(f"[dim][DEBUG] Duration: {duration:.1f}s[/dim]")
+        
+        # Validate output
+        passed, validation_msg = validate_test_output(test_name, full_output, duration)
+        
+        if debug:
+            console.print(f"[dim][DEBUG] Validation result: {passed} - {validation_msg}[/dim]")
+        
+        if not passed:
+            return TestResult(test_name, False, duration, full_output, validation_msg)
+        
+        # Check exit code
+        if process.returncode != 0:
+            return TestResult(test_name, False, duration, full_output, f"Non-zero exit code: {process.returncode}")
+        
+        return TestResult(test_name, True, duration, full_output)
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        if debug:
+            console.print(f"[dim red][DEBUG] Exception: {str(e)}[/dim red]")
+        return TestResult(test_name, False, duration, "", f"Test execution error: {str(e)}")
+
+def run_single_test(test_name, timeout=600, verbose=False, debug=False):
     """Run a single test with timeout and validation"""
     start_time = time.time()
     test_dir = create_test_workspace(test_name)
@@ -500,34 +669,40 @@ def run_single_test(test_name, timeout=600):
         else:
             return TestResult(test_name, False, 0, "", f"Unknown test type: {test_name}")
         
-        # Run the test command
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=test_dir
-            )
+        # Run the test command with progress indication
+        if verbose or debug:
+            # Use enhanced progress system
+            return run_test_with_progress(cmd, test_name, timeout, verbose, debug)
+        else:
+            # Use simple progress with spinner
+            try:
+                with console.status(f"Running {test_name} test...", spinner="dots"):
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        cwd=test_dir
+                    )
+                
+                duration = time.time() - start_time
+                output = result.stdout + result.stderr
+                
+                # Validate output
+                passed, validation_msg = validate_test_output(test_name, output, duration)
+                
+                if not passed:
+                    return TestResult(test_name, False, duration, output, validation_msg)
+                
+                # Check exit code
+                if result.returncode != 0:
+                    return TestResult(test_name, False, duration, output, f"Non-zero exit code: {result.returncode}")
+                
+                return TestResult(test_name, True, duration, output)
             
-            duration = time.time() - start_time
-            output = result.stdout + result.stderr
-            
-            # Validate output
-            passed, validation_msg = validate_test_output(test_name, output, duration)
-            
-            if not passed:
-                return TestResult(test_name, False, duration, output, validation_msg)
-            
-            # Check exit code
-            if result.returncode != 0:
-                return TestResult(test_name, False, duration, output, f"Non-zero exit code: {result.returncode}")
-            
-            return TestResult(test_name, True, duration, output)
-            
-        except subprocess.TimeoutExpired:
-            duration = time.time() - start_time
-            return TestResult(test_name, False, duration, "", f"Test timed out after {timeout} seconds")
+            except subprocess.TimeoutExpired:
+                duration = time.time() - start_time
+                return TestResult(test_name, False, duration, "", f"Test timed out after {timeout} seconds")
         
         except Exception as e:
             duration = time.time() - start_time
@@ -541,7 +716,7 @@ def run_single_test(test_name, timeout=600):
         except:
             pass  # Best effort cleanup
 
-def run_test_command(test_type=None, details=False, clean=False):
+def run_test_command(test_type=None, details=False, clean=False, verbose=False, debug=False):
     """Run RC test commands"""
     
     if clean:
@@ -592,7 +767,7 @@ def run_test_command(test_type=None, details=False, clean=False):
         with ThreadPoolExecutor(max_workers=len(tests_to_run)) as executor:
             # Submit all tests
             future_to_test = {
-                executor.submit(run_single_test, test): test 
+                executor.submit(run_single_test, test, 600, verbose, debug): test 
                 for test in tests_to_run
             }
             
@@ -620,8 +795,9 @@ def run_test_command(test_type=None, details=False, clean=False):
         # Run tests sequentially
         results = []
         for test in tests_to_run:
-            print(f"Running {test} test...")
-            result = run_single_test(test)
+            if not (verbose or debug):
+                print(f"Running {test} test...")
+            result = run_single_test(test, 600, verbose, debug)
             results.append(result)
             
             status = "✅ PASSED" if result.passed else "❌ FAILED"
@@ -681,6 +857,9 @@ Primary Mode (Default):
 Examples:
   rc -test                                    # Test basic functionality
   rc -test all                                # Run comprehensive test suite
+  rc -test -v                                 # Test with verbose progress
+  rc -test -d                                 # Test with debug output
+  rc -test all -v -d                          # Full test suite with all output
   rc -plan "Create a REST API for user management"
   rc -plan "Build a task tracker" -name task_manager
   rc -build ./plans/task_manager.md
@@ -730,6 +909,18 @@ Examples:
     )
     
     parser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Show detailed progress during test execution'
+    )
+    
+    parser.add_argument(
+        '-d', '--debug',
+        action='store_true',
+        help='Enable debug mode for test execution'
+    )
+    
+    parser.add_argument(
         '-check',
         action='store_true', 
         help='System health check'
@@ -752,7 +943,8 @@ Examples:
     
     # Testing system
     if args.test is not None:
-        run_test_command(test_type=args.test, details=args.details, clean=args.clean)
+        run_test_command(test_type=args.test, details=args.details, clean=args.clean, 
+                        verbose=args.verbose, debug=args.debug)
     elif args.check:
         run_quick_check()
     # Planning system
@@ -775,6 +967,8 @@ Examples:
         print("\nTesting:")
         print("  rc -test                                 # Basic functionality test")
         print("  rc -test all                             # Run all tests")
+        print("  rc -test -v                              # Test with verbose progress")
+        print("  rc -test -d                              # Test with debug output")
         print("  rc -check                                # System health check")
         print("\nPlanning system:")
         print("  rc -plan \"Your request here\" [-name plan_name]")
