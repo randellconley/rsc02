@@ -849,7 +849,10 @@ def run():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Testing Commands:
-  rc -test                                     Run basic direct prompt test
+  rc -test                                     Run basic direct prompt test (default)
+  rc -test quick                              Run ultra-fast simple test (math question)
+  rc -test simple                             Run medium complexity test (Python explanation)
+  rc -test basic                              Run complex test (directory analysis)
   rc -test plan                               Test plan generation functionality
   rc -test build                              Test build implementation functionality
   rc -test update                             Test update functionality
@@ -868,11 +871,11 @@ Primary Mode (Default):
   rc -f /path/to/prompt.txt                   Read prompt from file
 
 Examples:
-  rc -test                                    # Test basic functionality
+  rc -test quick                              # Ultra-fast test (math question)
+  rc -test simple -v                          # Medium test with verbose output
+  rc -test basic                              # Complex test (directory analysis)
   rc -test all                                # Run comprehensive test suite
-  rc -test -v                                 # Test with verbose progress
-  rc -test -d                                 # Test with debug output
-  rc -test all -v -d                          # Full test suite with all output
+  rc -test quick -v -d                        # Quick test with full debug output
   rc -plan "Create a REST API for user management"
   rc -plan "Build a task tracker" -name task_manager
   rc -build ./plans/task_manager.md
@@ -906,7 +909,7 @@ Examples:
         '-test',
         nargs='?',
         const='basic',
-        help='Run test commands: basic, plan, build, update, file, all'
+        help='Run test commands: quick, simple, basic, plan, build, update, file, all'
     )
     
     parser.add_argument(
