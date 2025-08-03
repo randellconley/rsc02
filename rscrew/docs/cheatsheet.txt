@@ -1,6 +1,6 @@
 # RSCrew Command Cheatsheet
 
-## Flag-Based Planning System Commands
+## Planning System Commands
 
 ### Generate Implementation Plans
 rc -plan "Your project description"
@@ -18,12 +18,12 @@ rc -update /path/to/plan.md
 rc -update ./plans/task_manager.md
 rc -update ./plans/my_app.md
 
-## Legacy Mode Commands
+## Primary Mode Commands (Default)
 
 ### Direct Prompt Execution
-rc Your prompt here
-rc Please analyze this project
-rc Help me debug this code
+rc "Your prompt here"
+rc "Please analyze this project"
+rc "Help me debug this code"
 
 ### File-Based Prompts
 rc -f /path/to/prompt.txt
@@ -80,6 +80,30 @@ RSCREW_DEBUG=true RSCREW_LLM_MAX_RETRIES=5 rc Your debugging request
 ./output/                                  # Execution logs and outputs
 ./output/debug_run_TIMESTAMP.txt           # Debug output files
 
+## Testing Commands
+
+### Multi-Model System Testing
+python model_manager_cli.py status        # Test all providers + show assignments
+python model_manager_cli.py providers     # List available providers
+python model_manager_cli.py agents        # List all agents and assignments
+
+### Quick System Health Tests
+python -c "from crew import create_crew; print('✅ Crew test passed')"
+python -c "from src.rscrew.model_manager import get_model_manager; print('✅ Model manager test passed')"
+
+### Test Commands ✅ IMPLEMENTED
+rc -test                                   # Run basic direct prompt test
+rc -test plan                             # Test plan generation functionality
+rc -test build                            # Test build implementation functionality
+rc -test update                           # Test update functionality
+rc -test file                             # Test file input functionality
+rc -test all                              # Run all tests in parallel
+rc -test --clean                          # Clean up test generated files
+rc -check                                 # System health check
+
+### Environment Test
+python -c "import os; print('API Keys:', {k:('✅' if v else '❌') for k,v in {'CLAUDE':os.getenv('ANTHROPIC_API_KEY'), 'GEMINI':os.getenv('GEMINI_API_KEY'), 'OPENAI':os.getenv('OPENAI_API_KEY'), 'DEEPSEEK':os.getenv('DEEPSEEK_API_KEY')}.items()})"
+
 ## Help Commands
 
 rc --help                                  # Show all available options
@@ -110,5 +134,6 @@ rc "Debug Python import errors"
 2. Plans are saved in ./plans/ directory with .md extension
 3. Use -update for iterative refinement of plans
 4. Enable debug mode when troubleshooting issues
-5. Legacy mode works for quick one-off requests
+5. Primary mode (direct prompts) works for quick one-off requests
 6. File-based prompts useful for complex or repeated requests
+7. Use test commands to verify system functionality before important work

@@ -13,6 +13,12 @@ from datetime import datetime
 from rscrew.crew import Rscrew
 from rscrew.output_capture import capture_output
 from rscrew.plan_manager import PlanManager, InteractivePlanSession
+import subprocess
+import tempfile
+import shutil
+import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def read_prompt_file(file_path):
     """Read prompt from a file."""
@@ -294,25 +300,387 @@ def run_plan_update(plan_path: str) -> None:
         print(f"❌ Error updating plan: {e}")
         sys.exit(1)
 
+def run_system_test():
+    """Run comprehensive system health check and connectivity tests."""
+    print("🚀 RSCrew System Health Check")
+    print("=" * 40)
+    
+    # Test 1: Dependencies
+    try:
+        import crewai, litellm, yaml, os
+        print("✅ Dependencies: All required packages installed")
+    except ImportError as e:
+        print(f"❌ Dependencies: Missing {e}")
+        return False
+    
+    # Test 2: Configuration
+    try:
+        from rscrew.model_manager import get_model_manager
+        manager = get_model_manager()
+        config = manager.config
+        print(f"✅ Configuration: {len(config['providers'])} providers configured")
+    except Exception as e:
+        print(f"❌ Configuration: {e}")
+        return False
+    
+    # Test 3: Model Manager
+    try:
+        from rscrew.model_manager import get_model_manager
+        manager = get_model_manager()
+        stats = manager.get_provider_stats()
+        print(f"✅ Model Manager: {len(stats['available_providers'])}/4 providers available")
+    except Exception as e:
+        print(f"❌ Model Manager: {e}")
+        return False
+    
+    # Test 4: Provider Connectivity (using model_manager_cli.py)
+    try:
+        print("\n🔗 Testing Provider Connectivity:")
+        result = subprocess.run([
+            sys.executable, 'model_manager_cli.py', 'status'
+        ], capture_output=True, text=True, cwd=Path(__file__).parent.parent.parent)
+        
+        if result.returncode == 0:
+            # Extract operational providers from output
+            operational_count = result.stdout.count("✅ Operational")
+            print(f"✅ Provider Connectivity: {operational_count}/4 providers operational")
+        else:
+            print("❌ Provider Connectivity: Failed to test providers")
+            print(f"Error: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"❌ Provider Connectivity: {e}")
+        return False
+    
+    # Test 5: Crew Creation
+    try:
+        from rscrew.crew import Rscrew
+        crew_instance = Rscrew()
+        crew = crew_instance.crew()
+        print(f"✅ Crew Creation: {len(crew.agents)} agents created successfully")
+    except Exception as e:
+        print(f"❌ Crew Creation: {e}")
+        return False
+    
+    print("\n🎉 All tests passed! System is operational.")
+    return True
+
+def run_quick_check():
+    """Run quick system status check."""
+    print("⚡ Quick System Check")
+    print("=" * 20)
+    
+    # Check API keys
+    api_keys = {
+        'CLAUDE': os.getenv('ANTHROPIC_API_KEY'),
+        'GEMINI': os.getenv('GEMINI_API_KEY'), 
+        'OPENAI': os.getenv('OPENAI_API_KEY'),
+        'DEEPSEEK': os.getenv('DEEPSEEK_API_KEY')
+    }
+    
+    print("API Keys:")
+    for provider, key in api_keys.items():
+        status = "✅" if key else "❌"
+        print(f"  {provider}: {status}")
+    
+    # Quick model manager test
+    try:
+        from rscrew.model_manager import get_model_manager
+        manager = get_model_manager()
+        stats = manager.get_provider_stats()
+        available = len(stats['available_providers'])
+        print(f"\nProviders: {available}/4 available")
+        
+        if available == 4:
+            print("✅ System ready")
+        else:
+            print("⚠️  Some providers unavailable")
+    except Exception as e:
+        print(f"❌ Model manager error: {e}")
+
+# Test Infrastructure Functions
+
+class TestResult:
+    def __init__(self, name, passed, duration, output="", error=""):
+        self.name = name
+        self.passed = passed
+        self.duration = duration
+        self.output = output
+        self.error = error
+
+def get_test_assets_dir():
+    """Get the path to test assets directory"""
+    current_file = Path(__file__).parent
+    project_root = current_file.parent.parent
+    return project_root / "tests" / "assets"
+
+def create_test_workspace(test_name):
+    """Create isolated test workspace"""
+    timestamp = int(time.time())
+    test_dir = Path(tempfile.gettempdir()) / f"rc_test_{test_name}_{timestamp}"
+    test_dir.mkdir(parents=True, exist_ok=True)
+    return test_dir
+
+def validate_test_output(test_name, output, duration):
+    """Fuzzy validation logic for test outputs"""
+    output_lower = output.lower()
+    
+    # Common failure patterns
+    failure_patterns = [
+        "fatal", "crashed", "failed", "error:", "exception:",
+        "traceback", "authentication failed", "permission denied"
+    ]
+    
+    # Check for immediate failures
+    if duration < 5:
+        return False, "Test completed too quickly (likely immediate failure)"
+    
+    # Check for timeout (should be handled by caller)
+    if duration > 600:  # 10 minutes
+        return False, "Test exceeded timeout"
+    
+    # Check for failure patterns
+    for pattern in failure_patterns:
+        if pattern in output_lower:
+            return False, f"Found failure pattern: {pattern}"
+    
+    # Test-specific validations
+    if test_name == "basic":
+        if len(output) < 100:
+            return False, "Output too short for basic prompt test"
+        if "agent" not in output_lower:
+            return False, "No agent activity detected"
+    
+    elif test_name == "plan":
+        if "plan" not in output_lower and ".md" not in output_lower:
+            return False, "No plan generation detected"
+    
+    elif test_name == "build":
+        if "build" not in output_lower and "implement" not in output_lower:
+            return False, "No build activity detected"
+    
+    elif test_name == "file":
+        if len(output) < 50:
+            return False, "Output too short for file input test"
+    
+    return True, "Test passed validation"
+
+def run_single_test(test_name, timeout=600):
+    """Run a single test with timeout and validation"""
+    start_time = time.time()
+    test_dir = create_test_workspace(test_name)
+    assets_dir = get_test_assets_dir()
+    
+    try:
+        # Change to test directory
+        original_cwd = os.getcwd()
+        os.chdir(test_dir)
+        
+        # Prepare test command based on test type
+        if test_name == "basic":
+            prompt = (assets_dir / "basic_prompt.txt").read_text().strip()
+            cmd = ["rc", prompt]
+        
+        elif test_name == "plan":
+            prompt = (assets_dir / "plan_prompt.txt").read_text().strip()
+            cmd = ["rc", "-plan", prompt, "-name", "test_calc"]
+        
+        elif test_name == "build":
+            plan_file = assets_dir / "test_plan.md"
+            cmd = ["rc", "-build", str(plan_file)]
+        
+        elif test_name == "update":
+            plan_file = assets_dir / "test_plan.md"
+            cmd = ["rc", "-update", str(plan_file)]
+        
+        elif test_name == "file":
+            prompt_file = assets_dir / "file_prompt.txt"
+            cmd = ["rc", "-f", str(prompt_file)]
+        
+        else:
+            return TestResult(test_name, False, 0, "", f"Unknown test type: {test_name}")
+        
+        # Run the test command
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=test_dir
+            )
+            
+            duration = time.time() - start_time
+            output = result.stdout + result.stderr
+            
+            # Validate output
+            passed, validation_msg = validate_test_output(test_name, output, duration)
+            
+            if not passed:
+                return TestResult(test_name, False, duration, output, validation_msg)
+            
+            # Check exit code
+            if result.returncode != 0:
+                return TestResult(test_name, False, duration, output, f"Non-zero exit code: {result.returncode}")
+            
+            return TestResult(test_name, True, duration, output)
+            
+        except subprocess.TimeoutExpired:
+            duration = time.time() - start_time
+            return TestResult(test_name, False, duration, "", f"Test timed out after {timeout} seconds")
+        
+        except Exception as e:
+            duration = time.time() - start_time
+            return TestResult(test_name, False, duration, "", f"Test execution error: {e}")
+    
+    finally:
+        # Cleanup
+        os.chdir(original_cwd)
+        try:
+            shutil.rmtree(test_dir)
+        except:
+            pass  # Best effort cleanup
+
+def run_test_command(test_type=None, details=False, clean=False):
+    """Run RC test commands"""
+    
+    if clean:
+        # Clean up test artifacts
+        project_root = Path(__file__).parent.parent.parent
+        test_dirs = [
+            project_root / "tests" / "runs",
+            project_root / "tests" / "results"
+        ]
+        
+        cleaned = 0
+        for test_dir in test_dirs:
+            if test_dir.exists():
+                try:
+                    shutil.rmtree(test_dir)
+                    test_dir.mkdir(parents=True, exist_ok=True)
+                    cleaned += 1
+                except Exception as e:
+                    print(f"⚠️  Could not clean {test_dir}: {e}")
+        
+        print(f"🧹 Cleaned {cleaned} test directories")
+        return
+    
+    # Define available tests
+    available_tests = ["basic", "plan", "build", "update", "file"]
+    
+    if test_type and test_type not in available_tests + ["all"]:
+        print(f"❌ Unknown test type: {test_type}")
+        print(f"Available tests: {', '.join(available_tests + ['all'])}")
+        return
+    
+    # Determine which tests to run
+    if test_type == "all" or test_type is None:
+        tests_to_run = available_tests
+        parallel = True
+    else:
+        tests_to_run = [test_type]
+        parallel = False
+    
+    print("🧪 RC Test Suite")
+    print("=" * 40)
+    
+    if parallel and len(tests_to_run) > 1:
+        # Run tests in parallel
+        print(f"Running {len(tests_to_run)} tests in parallel...")
+        print()
+        
+        with ThreadPoolExecutor(max_workers=len(tests_to_run)) as executor:
+            # Submit all tests
+            future_to_test = {
+                executor.submit(run_single_test, test): test 
+                for test in tests_to_run
+            }
+            
+            results = []
+            for future in as_completed(future_to_test):
+                test_name = future_to_test[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    
+                    # Show progress
+                    status = "✅ PASSED" if result.passed else "❌ FAILED"
+                    duration_str = f"{result.duration:.1f}s"
+                    print(f"{status} {result.name.title()} Test ({duration_str})")
+                    
+                    if not result.passed:
+                        print(f"   Error: {result.error}")
+                    
+                except Exception as e:
+                    results.append(TestResult(test_name, False, 0, "", str(e)))
+                    print(f"❌ FAILED {test_name.title()} Test (error)")
+                    print(f"   Error: {e}")
+    
+    else:
+        # Run tests sequentially
+        results = []
+        for test in tests_to_run:
+            print(f"Running {test} test...")
+            result = run_single_test(test)
+            results.append(result)
+            
+            status = "✅ PASSED" if result.passed else "❌ FAILED"
+            duration_str = f"{result.duration:.1f}s"
+            print(f"{status} {result.name.title()} Test ({duration_str})")
+            
+            if not result.passed:
+                print(f"   Error: {result.error}")
+            
+            if details and result.output:
+                print(f"\n--- {test.title()} Test Output ---")
+                print(result.output[:1000] + ("..." if len(result.output) > 1000 else ""))
+                print("--- End Output ---\n")
+    
+    # Summary
+    passed = sum(1 for r in results if r.passed)
+    total = len(results)
+    
+    print()
+    print("=" * 40)
+    print(f"Results: {passed}/{total} tests passed")
+    
+    if passed == total:
+        print("🎉 All tests passed!")
+    else:
+        print("⚠️  Some tests failed")
+        print("Use 'rc -test <name> --details' for expanded output")
+
 def run():
     """
     Main entry point for the RC command.
-    Handles flag-based planning system and legacy prompt mode.
+    Handles flag-based planning system and direct prompt mode.
     """
     parser = argparse.ArgumentParser(
-        description='RC - RSCrew Command Runner. Flag-based planning system.',
+        description='RC - RSCrew Command Runner. Direct prompts and planning system.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Flag-Based Planning System:
-  rc -plan "Build a web app" [-name my_app]     Generate implementation plan
-  rc -build /path/to/plan.md                   Implement from plan
-  rc -update /path/to/plan.md                  Interactive plan updates
+Testing Commands:
+  rc -test                                     Run basic direct prompt test
+  rc -test plan                               Test plan generation functionality
+  rc -test build                              Test build implementation functionality
+  rc -test update                             Test update functionality
+  rc -test file                               Test file input functionality
+  rc -test all                                Run all tests in parallel
+  rc -test --clean                            Clean up test generated files
+  rc -check                                   System health check
 
-Legacy Mode:
-  rc Please analyze this project                Traditional crew execution
-  rc -f /path/to/prompt.txt                    Read prompt from file
+Planning System:
+  rc -plan "Build a web app" [-name my_app]   Generate implementation plan
+  rc -build /path/to/plan.md                  Implement from plan
+  rc -update /path/to/plan.md                 Interactive plan updates
+
+Primary Mode (Default):
+  rc "Your prompt here"                       Direct crew execution
+  rc -f /path/to/prompt.txt                   Read prompt from file
 
 Examples:
+  rc -test                                    # Test basic functionality
+  rc -test all                                # Run comprehensive test suite
   rc -plan "Create a REST API for user management"
   rc -plan "Build a task tracker" -name task_manager
   rc -build ./plans/task_manager.md
@@ -341,29 +709,60 @@ Examples:
         help='Start interactive plan update session'
     )
     
-    # Legacy arguments
+    # Testing arguments
+    parser.add_argument(
+        '-test',
+        nargs='?',
+        const='basic',
+        help='Run test commands: basic, plan, build, update, file, all'
+    )
+    
+    parser.add_argument(
+        '--clean',
+        action='store_true',
+        help='Clean up test generated files (use with -test)'
+    )
+    
+    parser.add_argument(
+        '--details',
+        action='store_true',
+        help='Show detailed test output (use with -test)'
+    )
+    
+    parser.add_argument(
+        '-check',
+        action='store_true', 
+        help='System health check'
+    )
+    
+    # Primary mode arguments
     parser.add_argument(
         '-f', '--file',
-        help='Read prompt from a file (legacy mode)'
+        help='Read prompt from a file'
     )
     
     parser.add_argument(
         'prompt',
         nargs='*',
-        help='The prompt/request for the CrewAI agents (legacy mode)'
+        help='The prompt/request for the CrewAI agents (primary mode)'
     )
     
     # Parse arguments
     args = parser.parse_args()
     
-    # Flag-based planning system
-    if args.plan:
+    # Testing system
+    if args.test is not None:
+        run_test_command(test_type=args.test, details=args.details, clean=args.clean)
+    elif args.check:
+        run_quick_check()
+    # Planning system
+    elif args.plan:
         run_plan_generation(args.plan, args.name)
     elif args.build:
         run_plan_implementation(args.build)
     elif args.update:
         run_plan_update(args.update)
-    # Legacy mode
+    # Primary mode
     elif args.file:
         user_prompt = read_prompt_file(args.file)
         run_crew_with_prompt(user_prompt)
@@ -373,12 +772,16 @@ Examples:
     else:
         # No arguments provided
         print("❌ Error: No command provided. Use either:")
-        print("\nFlag-based planning:")
+        print("\nTesting:")
+        print("  rc -test                                 # Basic functionality test")
+        print("  rc -test all                             # Run all tests")
+        print("  rc -check                                # System health check")
+        print("\nPlanning system:")
         print("  rc -plan \"Your request here\" [-name plan_name]")
         print("  rc -build /path/to/plan.md")
         print("  rc -update /path/to/plan.md")
-        print("\nLegacy mode:")
-        print("  rc Your prompt here")
+        print("\nPrimary mode:")
+        print("  rc \"Your prompt here\"")
         print("  rc -f /path/to/prompt.txt")
         print("\nUse 'rc --help' for more information.")
         sys.exit(1)

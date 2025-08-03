@@ -1,0 +1,1 @@
+Analyze the current directory structure and provide a brief summary of the project organization.
