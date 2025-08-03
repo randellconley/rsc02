@@ -699,14 +699,13 @@ def run_single_test(test_name, timeout=600, verbose=False, debug=False):
                     return TestResult(test_name, False, duration, output, f"Non-zero exit code: {result.returncode}")
                 
                 return TestResult(test_name, True, duration, output)
-            
+                
             except subprocess.TimeoutExpired:
                 duration = time.time() - start_time
                 return TestResult(test_name, False, duration, "", f"Test timed out after {timeout} seconds")
-        
-        except Exception as e:
-            duration = time.time() - start_time
-            return TestResult(test_name, False, duration, "", f"Test execution error: {e}")
+            except Exception as e:
+                duration = time.time() - start_time
+                return TestResult(test_name, False, duration, "", f"Test execution error: {e}")
     
     finally:
         # Cleanup
