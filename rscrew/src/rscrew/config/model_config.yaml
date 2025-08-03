@@ -11,7 +11,7 @@ providers:
     description: Best for complex reasoning, code generation, and strategic planning
     cost_tier: premium
   gemini:
-    model: gemini-1.5-pro
+    model: gemini/gemini-1.5-pro
     api_key_env: GEMINI_API_KEY
     description: Excellent for information processing and analysis
     cost_tier: standard
@@ -21,7 +21,7 @@ providers:
     description: Strong general-purpose model with good reasoning
     cost_tier: premium
   deepseek:
-    model: deepseek-chat
+    model: deepseek/deepseek-chat
     api_key_env: DEEPSEEK_API_KEY
     description: Cost-effective model good for coding and technical tasks
     cost_tier: budget

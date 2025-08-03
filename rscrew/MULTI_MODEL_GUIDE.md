@@ -31,6 +31,14 @@ DEEPSEEK_API_KEY=your_deepseek_key_here
 python model_manager_cli.py status
 ```
 
+**Status Indicators:**
+- 🔑 = API key found in environment
+- ✅ = API is functional and responding
+- ❌ = API key missing or API not responding
+- ⏭️ = Skipped (no API key to test)
+
+The status command automatically tests API connectivity for all providers.
+
 ### 3. View Available Providers
 
 ```bash

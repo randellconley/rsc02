@@ -46,8 +46,45 @@ def save_config(config: Dict[str, Any], config_path: str = "src/rscrew/config/mo
         print(f"❌ Error saving config: {e}")
         return False
 
+def test_provider_connectivity(provider: str, config: Dict[str, Any]) -> tuple[bool, str]:
+    """Test if a provider is actually reachable and functional"""
+    try:
+        provider_config = config.get('providers', {}).get(provider, {})
+        api_key_env = provider_config.get('api_key_env', '')
+        api_key = os.getenv(api_key_env)
+        
+        if not api_key:
+            return False, "API key not found"
+        
+        # Import here to avoid circular imports
+        from crewai import LLM
+        
+        # Create a minimal LLM instance to test connectivity
+        model = provider_config.get('model', '')
+        llm = LLM(model=model, api_key=api_key)
+        
+        # Try a minimal call to test connectivity
+        # This is a very short prompt to minimize cost
+        test_result = llm.call("Hi")
+        
+        if test_result and len(str(test_result).strip()) > 0:
+            return True, "Operational"
+        else:
+            return False, "No response"
+            
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "api key" in error_msg or "authentication" in error_msg:
+            return False, "Invalid API key"
+        elif "rate limit" in error_msg:
+            return False, "Rate limited"
+        elif "network" in error_msg or "connection" in error_msg:
+            return False, "Network error"
+        else:
+            return False, f"Error: {str(e)[:50]}..."
+
 def show_status():
-    """Show current model assignments and provider status"""
+    """Show current model assignments and provider status with connectivity testing"""
     print("🚀 RSCrew Multi-Model Status")
     print("=" * 50)
     
@@ -56,9 +93,19 @@ def show_status():
         stats = manager.get_provider_stats()
         
         print(f"\n📊 Provider Status:")
-        print(f"✅ Available: {', '.join(stats['available_providers'])}")
-        if stats['unavailable_providers']:
-            print(f"❌ Unavailable: {', '.join(stats['unavailable_providers'])}")
+        print("🧪 Testing API connectivity...")
+        config = load_config()
+        
+        for provider in ['claude', 'gemini', 'openai', 'deepseek']:
+            api_key_env = config.get('providers', {}).get(provider, {}).get('api_key_env', '')
+            has_key = "🔑" if os.getenv(api_key_env) else "❌"
+            
+            if os.getenv(api_key_env):
+                is_functional, status_msg = test_provider_connectivity(provider, config)
+                status_icon = "✅" if is_functional else "❌"
+                print(f"  {provider.upper()}: {has_key} {status_icon} {status_msg}")
+            else:
+                print(f"  {provider.upper()}: {has_key} ⏭️  Skipped (no API key)")
         
         print(f"\n📈 Load Distribution:")
         for provider, count in stats['provider_distribution'].items():
@@ -218,7 +265,7 @@ def main():
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Status command
-    subparsers.add_parser('status', help='Show current model assignments and provider status')
+    subparsers.add_parser('status', help='Show current model assignments and provider status with connectivity testing')
     
     # List commands
     subparsers.add_parser('agents', help='List all available agents')
