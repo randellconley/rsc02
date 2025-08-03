@@ -113,7 +113,8 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
                 # Check if part is an action/command
                 is_action = (
                     any(part.startswith(aw) for aw in action_words) or
-                    any(keyword in part for keyword in ['build me', 'create a', 'develop a', 'implement a', 'write a', 'make a', 'code a'])
+                    any(keyword in part for keyword in ['build me', 'create a', 'develop a', 'implement a', 'write a', 'make a', 'code a', 'create one', 'build one', 'make one']) or
+                    any(aw in part for aw in action_words)  # Check if action word appears anywhere in the part
                 )
                 
                 if is_question:
@@ -127,22 +128,22 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
                     all_questions = False
                     all_actions = False
         
-        # Only classify as INFORMATION if ALL parts are questions
+        # If there are ANY action items in the prompt → IMPLEMENTATION
+        if action_count > 0:
+            return {
+                "intent": "IMPLEMENTATION",
+                "confidence": "High 0.85",
+                "workflow": "Full Development",
+                "reasoning": "Contains action statements - classified as implementation request"
+            }
+        
+        # Only classify as INFORMATION if ALL parts are questions (and no actions)
         if all_questions and question_count > 0:
             return {
                 "intent": "INFORMATION",
                 "confidence": "High 0.85",
                 "workflow": "Quick Response",
                 "reasoning": "All sentences are questions - classified as information request"
-            }
-        
-        # Only classify as IMPLEMENTATION if ALL parts are action statements
-        if all_actions and action_count > 0:
-            return {
-                "intent": "IMPLEMENTATION",
-                "confidence": "High 0.85",
-                "workflow": "Full Development",
-                "reasoning": "All sentences are action statements - classified as implementation request"
             }
     
     # Information request indicators (including analysis, reports, general info gathering)
