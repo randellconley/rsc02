@@ -98,6 +98,7 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
         all_actions = True
         question_count = 0
         action_count = 0
+        vague_count = 0
         
         for part in expanded_parts:
             part = part.strip()
@@ -110,12 +111,19 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
                     any(qw in part for qw in ['what', 'how', 'why', 'when', 'where', 'who', 'which'])
                 )
                 
-                # Check if part is an action/command
-                is_action = (
-                    any(part.startswith(aw) for aw in action_words) or
-                    any(keyword in part for keyword in ['build me', 'create a', 'develop a', 'implement a', 'write a', 'make a', 'code a', 'create one', 'build one', 'make one']) or
-                    any(aw in part for aw in action_words)  # Check if action word appears anywhere in the part
-                )
+                # Check if part is an action/command (exclude vague suggestions)
+                # First check for vague/hypothetical language that should NOT be treated as actions
+                vague_indicators = ['maybe', 'might', 'could', 'perhaps', 'possibly', 'what if', 'how about']
+                is_vague = any(indicator in part for indicator in vague_indicators)
+                
+                if is_vague:
+                    is_action = False  # Vague suggestions are not concrete actions
+                else:
+                    is_action = (
+                        any(part.startswith(aw) for aw in action_words) or
+                        any(keyword in part for keyword in ['build me', 'create a', 'develop a', 'implement a', 'write a', 'make a', 'code a', 'create one', 'build one', 'make one', 'please build', 'please create', 'please make']) or
+                        any(aw in part for aw in action_words if not is_vague)  # Only if not vague
+                    )
                 
                 if is_question:
                     question_count += 1
@@ -123,8 +131,12 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
                 elif is_action:
                     action_count += 1
                     all_questions = False
+                elif is_vague:
+                    vague_count += 1
+                    all_questions = False
+                    all_actions = False
                 else:
-                    # Neither clear question nor clear action
+                    # Neither question, action, nor vague - neutral content
                     all_questions = False
                     all_actions = False
         
@@ -166,13 +178,22 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
                     "reasoning": "Contains action statements with sufficient confidence - classified as implementation request"
                 }
         
-        # Only classify as INFORMATION if ALL parts are questions (and no actions)
-        if all_questions and question_count > 0:
+        # Classify as INFORMATION if we have questions and no concrete actions
+        if question_count > 0 and action_count == 0:
             return {
                 "intent": "INFORMATION",
                 "confidence": "High 0.85",
                 "workflow": "Quick Response",
                 "reasoning": "All sentences are questions - classified as information request"
+            }
+        
+        # Handle vague-only content (no concrete actions or questions)
+        if action_count == 0 and question_count == 0 and vague_count > 0:
+            return {
+                "intent": "INFORMATION",
+                "confidence": "Low 0.30",
+                "workflow": "Quick Response",
+                "reasoning": "Contains only vague suggestions without concrete actions or questions - classified as information request"
             }
     
     # Information request indicators (including analysis, reports, general info gathering)
