@@ -618,6 +618,296 @@ class Rscrew():
         crew_instance = self.crew()
         return crew_instance.kickoff(inputs=enhanced_inputs)
 
+    def detect_domain_expertise_needed(self, request: str) -> List[str]:
+        """
+        Detect which specialist domains are relevant to the request.
+        
+        Args:
+            request: User's request text
+            
+        Returns:
+            List of relevant domain names
+        """
+        domains = []
+        request_lower = request.lower()
+        
+        domain_keywords = {
+            'infrastructure': [
+                'aws', 'cloud', 'docker', 'kubernetes', 'deploy', 'deployment', 'ci/cd', 'devops', 
+                'infrastructure', 'server', 'hosting', 'load balancer', 'scaling', 'containerization',
+                'terraform', 'ansible', 'jenkins', 'gitlab', 'github actions', 'azure', 'gcp'
+            ],
+            'database': [
+                'database', 'sql', 'mysql', 'postgresql', 'mongodb', 'schema', 'query', 'db',
+                'redis', 'elasticsearch', 'cassandra', 'dynamodb', 'migration', 'backup',
+                'db performance', 'database performance', 'indexing', 'normalization', 'orm', 'transaction'
+            ],
+            'security': [
+                'security', 'secure', 'auth', 'authentication', 'authorization', 'oauth', 'jwt', 'encryption', 
+                'ssl', 'tls', 'vulnerability', 'penetration', 'firewall', 'vpn', 'certificate',
+                'password', 'token', 'session', 'csrf', 'xss', 'injection', 'compliance'
+            ],
+            'frontend': [
+                'frontend', 'ui', 'ux', 'react', 'vue', 'angular', 'css', 'html', 'javascript',
+                'typescript', 'responsive', 'mobile', 'browser', 'dom', 'component', 'state',
+                'routing', 'webpack', 'vite', 'sass', 'tailwind', 'bootstrap'
+            ],
+            'feature': [
+                'feature', 'functionality', 'business', 'requirement', 'user story', 'workflow',
+                'process', 'logic', 'rules', 'validation', 'integration', 'api', 'endpoint'
+            ]
+        }
+        
+        for domain, keywords in domain_keywords.items():
+            if any(keyword in request_lower for keyword in keywords):
+                domains.append(domain)
+                debug_print(f"Detected domain '{domain}' for request")
+        
+        debug_print(f"Total domains detected: {domains}")
+        return domains
+
+    def run_enhanced_information_workflow(self, inputs: Dict[str, Any]) -> str:
+        """
+        Run enhanced information workflow with domain-specific specialist advisory.
+        
+        Args:
+            inputs: Standard crew inputs including 'topic' and 'execution_context'
+            
+        Returns:
+            Expert advisory response from relevant specialists
+        """
+        debug_print("=== Starting Enhanced Information Workflow ===")
+        
+        request = inputs.get('topic', '')
+        relevant_domains = self.detect_domain_expertise_needed(request)
+        
+        # Always include research analyst for general research coordination
+        agents = [self.research_analyst()]
+        
+        # Add relevant specialists as advisors
+        if 'infrastructure' in relevant_domains:
+            agents.append(self.infrastructure_specialist())
+            debug_print("Added Infrastructure Specialist")
+        if 'database' in relevant_domains:
+            agents.append(self.database_architecture_specialist())
+            debug_print("Added Database Architecture Specialist")
+        if 'security' in relevant_domains:
+            agents.append(self.security_architecture_specialist())
+            debug_print("Added Security Architecture Specialist")
+        if 'frontend' in relevant_domains:
+            agents.append(self.frontend_architecture_specialist())
+            debug_print("Added Frontend Architecture Specialist")
+        if 'feature' in relevant_domains:
+            agents.append(self.feature_analyst())
+            debug_print("Added Feature Analyst")
+        
+        # Always include technical writer for final response coordination
+        agents.append(self.technical_writer())
+        
+        # Apply error handling to all agents
+        robust_agents = apply_tenacity_error_handling_to_agents(agents)
+        
+        # Create advisory tasks based on detected domains
+        tasks = self.create_advisory_tasks(relevant_domains, inputs)
+        
+        # Execute enhanced information workflow
+        enhanced_crew = Crew(
+            agents=robust_agents,
+            tasks=tasks,
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        debug_print(f"Enhanced information workflow crew created with {len(robust_agents)} agents")
+        result = enhanced_crew.kickoff(inputs=inputs)
+        debug_print("=== Enhanced Information Workflow Complete ===")
+        
+        return result
+
+    def create_advisory_tasks(self, domains: List[str], inputs: Dict[str, Any]) -> List[Task]:
+        """
+        Create advisory tasks based on detected domains.
+        
+        Args:
+            domains: List of detected domain names
+            inputs: Standard crew inputs
+            
+        Returns:
+            List of tasks for the advisory workflow
+        """
+        from crewai import Task
+        tasks = []
+        
+        # Always start with research coordination
+        research_task = Task(
+            description=f"""
+            As the Technical Research Specialist, coordinate the advisory response:
+            
+            User Request: {inputs.get('topic', '')}
+            Context: {inputs.get('execution_context', '')}
+            Detected Domains: {', '.join(domains) if domains else 'General'}
+            
+            Provide initial research and coordinate with domain specialists to ensure:
+            1. Comprehensive coverage of the user's question
+            2. Integration of specialist insights
+            3. Clear, actionable information
+            4. Identification of any gaps that need specialist input
+            
+            Focus on research coordination and general technical context.
+            """,
+            expected_output="Research coordination and general technical context for specialist advisory",
+            agent=self.research_analyst()
+        )
+        tasks.append(research_task)
+        
+        # Add domain-specific advisory tasks
+        if 'infrastructure' in domains:
+            infra_task = Task(
+                description=f"""
+                As the Infrastructure Specialist, provide expert advisory on infrastructure aspects:
+                
+                User Request: {inputs.get('topic', '')}
+                Context: {inputs.get('execution_context', '')}
+                Research Context: Use the research analyst's coordination
+                
+                Focus on infrastructure, DevOps, cloud, and deployment considerations:
+                1. Best practices for the specific infrastructure challenge
+                2. Recommended tools and technologies
+                3. Architecture considerations and scalability
+                4. Security and reliability implications
+                5. Implementation guidance and common pitfalls
+                6. Cost and performance considerations
+                
+                Provide expert-level infrastructure advice without full implementation details.
+                """,
+                expected_output="Expert infrastructure advisory with best practices and recommendations",
+                agent=self.infrastructure_specialist()
+            )
+            tasks.append(infra_task)
+        
+        if 'database' in domains:
+            db_task = Task(
+                description=f"""
+                As the Database Architecture Specialist, provide expert advisory on database aspects:
+                
+                User Request: {inputs.get('topic', '')}
+                Context: {inputs.get('execution_context', '')}
+                Research Context: Use the research analyst's coordination
+                
+                Focus on database design, optimization, and best practices:
+                1. Database technology recommendations and trade-offs
+                2. Schema design considerations and normalization
+                3. Performance optimization strategies
+                4. Scaling approaches and migration strategies
+                5. Security, backup, and recovery considerations
+                6. Query optimization and indexing guidance
+                
+                Provide expert-level database advice without full implementation details.
+                """,
+                expected_output="Expert database advisory with technology recommendations and best practices",
+                agent=self.database_architecture_specialist()
+            )
+            tasks.append(db_task)
+        
+        if 'security' in domains:
+            security_task = Task(
+                description=f"""
+                As the Security Architecture Specialist, provide expert advisory on security aspects:
+                
+                User Request: {inputs.get('topic', '')}
+                Context: {inputs.get('execution_context', '')}
+                Research Context: Use the research analyst's coordination
+                
+                Focus on security design, authentication, and best practices:
+                1. Security architecture recommendations
+                2. Authentication and authorization strategies
+                3. Encryption and data protection approaches
+                4. Vulnerability assessment and mitigation
+                5. Compliance and regulatory considerations
+                6. Security monitoring and incident response
+                
+                Provide expert-level security advice without full implementation details.
+                """,
+                expected_output="Expert security advisory with architecture recommendations and best practices",
+                agent=self.security_architecture_specialist()
+            )
+            tasks.append(security_task)
+        
+        if 'frontend' in domains:
+            frontend_task = Task(
+                description=f"""
+                As the Frontend Architecture Specialist, provide expert advisory on frontend aspects:
+                
+                User Request: {inputs.get('topic', '')}
+                Context: {inputs.get('execution_context', '')}
+                Research Context: Use the research analyst's coordination
+                
+                Focus on frontend design, user experience, and best practices:
+                1. Frontend technology recommendations and frameworks
+                2. User interface design patterns and best practices
+                3. Performance optimization and responsive design
+                4. Accessibility and cross-browser compatibility
+                5. State management and component architecture
+                6. Build tools and development workflow
+                
+                Provide expert-level frontend advice without full implementation details.
+                """,
+                expected_output="Expert frontend advisory with technology recommendations and best practices",
+                agent=self.frontend_architecture_specialist()
+            )
+            tasks.append(frontend_task)
+        
+        if 'feature' in domains:
+            feature_task = Task(
+                description=f"""
+                As the Feature Analyst, provide expert advisory on feature and business logic aspects:
+                
+                User Request: {inputs.get('topic', '')}
+                Context: {inputs.get('execution_context', '')}
+                Research Context: Use the research analyst's coordination
+                
+                Focus on feature design, business logic, and requirements:
+                1. Feature architecture and design patterns
+                2. Business logic implementation strategies
+                3. User workflow and experience considerations
+                4. Integration requirements and API design
+                5. Validation and error handling approaches
+                6. Testing and quality assurance strategies
+                
+                Provide expert-level feature analysis without full implementation details.
+                """,
+                expected_output="Expert feature advisory with design patterns and implementation strategies",
+                agent=self.feature_analyst()
+            )
+            tasks.append(feature_task)
+        
+        # Always end with technical writing coordination
+        final_task = Task(
+            description=f"""
+            As the Technical Documentation Specialist, create a comprehensive advisory response:
+            
+            User Request: {inputs.get('topic', '')}
+            Specialist Insights: Integrate all specialist advisory inputs
+            Research Context: Use the research analyst's coordination
+            
+            Create a unified response that:
+            1. Directly addresses the user's question with expert insights
+            2. Integrates recommendations from all relevant specialists
+            3. Organizes information in a logical, easy-to-follow structure
+            4. Provides actionable next steps and best practices
+            5. Highlights any important considerations or trade-offs
+            6. Uses clear formatting for readability
+            
+            This is an expert advisory response, not implementation documentation.
+            """,
+            expected_output="Comprehensive expert advisory response integrating all specialist insights",
+            agent=self.technical_writer()
+        )
+        tasks.append(final_task)
+        
+        debug_print(f"Created {len(tasks)} advisory tasks for domains: {domains}")
+        return tasks
+
     def run_information_workflow(self, inputs: Dict[str, Any]) -> str:
         """
         Run a simplified workflow for information requests without interactive dialogue.

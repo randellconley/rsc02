@@ -423,15 +423,32 @@ def run_crew_with_prompt(user_prompt):
         
         # Route to appropriate workflow based on intent
         if intent_result["intent"] == "INFORMATION":
-            debug_print("Routing to simple information workflow...")
-            # Check if simple information workflow exists, otherwise fallback
-            if hasattr(crew_instance, 'run_information_workflow'):
-                result = crew_instance.run_information_workflow(inputs)
-                debug_print("Information workflow completed")
+            # Determine if enhanced workflow is needed based on domain complexity
+            if hasattr(crew_instance, 'detect_domain_expertise_needed'):
+                relevant_domains = crew_instance.detect_domain_expertise_needed(user_prompt)
+                
+                if relevant_domains and hasattr(crew_instance, 'run_enhanced_information_workflow'):
+                    debug_print(f"Routing to enhanced information workflow for domains: {relevant_domains}")
+                    result = crew_instance.run_enhanced_information_workflow(inputs)
+                    debug_print("Enhanced information workflow completed")
+                elif hasattr(crew_instance, 'run_information_workflow'):
+                    debug_print("Routing to simple information workflow...")
+                    result = crew_instance.run_information_workflow(inputs)
+                    debug_print("Simple information workflow completed")
+                else:
+                    debug_print("Information workflows not implemented, falling back to interactive dialogue...")
+                    result = crew_instance.run_with_interactive_dialogue(inputs)
+                    debug_print("Interactive workflow completed")
             else:
-                debug_print("Information workflow not implemented, falling back to interactive dialogue...")
-                result = crew_instance.run_with_interactive_dialogue(inputs)
-                debug_print("Interactive workflow completed")
+                # Fallback to simple information workflow if domain detection not available
+                debug_print("Domain detection not available, routing to simple information workflow...")
+                if hasattr(crew_instance, 'run_information_workflow'):
+                    result = crew_instance.run_information_workflow(inputs)
+                    debug_print("Simple information workflow completed")
+                else:
+                    debug_print("Information workflow not implemented, falling back to interactive dialogue...")
+                    result = crew_instance.run_with_interactive_dialogue(inputs)
+                    debug_print("Interactive workflow completed")
         else:
             debug_print("Routing to full interactive dialogue workflow...")
             result = crew_instance.run_with_interactive_dialogue(inputs)
