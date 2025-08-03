@@ -1,0 +1,174 @@
+# Dynamic Agent Permissions Configuration
+# Controls what each agent can do in implementation mode
+
+global_settings:
+  max_weekly_cost: 5.00  # USD per week threshold for confirmations
+  aws_account_boundary: true  # Block writes outside AWS account
+  external_read_allowed: true  # Allow reading external resources
+  auto_rollback: true  # Automatically create git branches
+  confirmation_threshold: "MEDIUM"  # LOW, MEDIUM, HIGH
+  
+# Default permissions by agent role
+agent_default_permissions:
+  technical_research_specialist:
+    - read
+    - analyze
+    - basic_write
+    - git_operations
+    - external_read
+    - api_calls
+    
+  solution_architect:
+    - read
+    - analyze
+    - design
+    - config_write
+    - git_operations
+    - external_read
+    - api_calls
+    - service_configure
+    
+  code_implementer:
+    - read
+    - write
+    - execute
+    - deploy
+    - git_operations
+    - test
+    - external_read
+    - api_calls
+    - system_admin
+    - service_restart
+    
+  quality_assurance:
+    - read
+    - test
+    - validate
+    - git_operations
+    - external_read
+    - api_calls
+    - basic_write
+    
+  technical_writer:
+    - read
+    - write
+    - documentation
+    - git_operations
+    - external_read
+    - api_calls
+    
+  plan_update_coordinator:
+    - read
+    - write
+    - plan_management
+    - git_operations
+    - external_read
+    - api_calls
+    - config_write
+
+# Permission definitions
+permission_definitions:
+  read:
+    description: "Read files and directories"
+    tools: ["list_directory", "read_file"]
+    risk_level: "LOW"
+    
+  write:
+    description: "Write and modify files"
+    tools: ["write_file", "create_directory"]
+    risk_level: "MEDIUM"
+    
+  execute:
+    description: "Execute system commands"
+    tools: ["execute_command"]
+    risk_level: "MEDIUM"
+    
+  git_operations:
+    description: "Git version control operations"
+    tools: ["git_branch", "git_commit", "git_merge"]
+    risk_level: "LOW"
+    
+  external_read:
+    description: "Read external resources (APIs, websites)"
+    tools: ["external_read", "api_call"]
+    risk_level: "LOW"
+    
+  api_calls:
+    description: "Make API calls to external services"
+    tools: ["api_call", "model_api_call"]
+    risk_level: "LOW"
+    
+  service_configure:
+    description: "Configure system services"
+    tools: ["configure_service", "apache_config", "nginx_config"]
+    risk_level: "HIGH"
+    
+  service_restart:
+    description: "Restart system services"
+    tools: ["restart_service", "reload_service"]
+    risk_level: "HIGH"
+    
+  system_admin:
+    description: "System administration tasks"
+    tools: ["install_package", "modify_system_config"]
+    risk_level: "HIGH"
+
+# User permission overrides (can be modified by user)
+user_permission_overrides:
+  # Example overrides - user can modify these
+  code_implementer:
+    additional_permissions: []
+    restricted_permissions: []
+    
+  # Global overrides
+  global_restrictions:
+    blocked_commands: []
+    blocked_paths: []
+    
+# Cost estimation rules
+cost_estimation:
+  api_call_cost: 0.002  # Per API call
+  compute_minute_cost: 0.01  # Per minute of compute
+  storage_gb_cost: 0.023  # Per GB of storage per month
+  
+# Confirmation rules
+confirmation_rules:
+  always_confirm:
+    - "delete"
+    - "remove"
+    - "drop"
+    - "production"
+    - "live"
+    
+  cost_threshold_confirm: 5.00  # USD
+  
+  external_write_confirm: true
+  
+# Learning system settings
+learning_settings:
+  enabled: true
+  min_interactions_for_learning: 5
+  preference_weight: 0.3  # How much to weight learned preferences
+  
+# Safety settings
+safety_settings:
+  max_command_timeout: 30  # seconds
+  max_file_size: 10485760  # 10MB
+  allowed_file_extensions: 
+    - ".py"
+    - ".js"
+    - ".html"
+    - ".css"
+    - ".md"
+    - ".txt"
+    - ".json"
+    - ".yaml"
+    - ".yml"
+    - ".conf"
+    - ".config"
+    
+  blocked_paths:
+    - "/etc/passwd"
+    - "/etc/shadow"
+    - "/root"
+    - "/home/*/.*ssh*"

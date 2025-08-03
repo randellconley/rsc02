@@ -14,6 +14,8 @@ from rscrew.tools.programming_tools import (
     OperatorIntentTools, ProjectManagementTools, TechnicalResearchTools, ArchitectureTools,
     DevelopmentTools, QualityAssuranceTools, DocumentationTools
 )
+from rscrew.tools.implementation_tools import IMPLEMENTATION_TOOLS
+from rscrew.dynamic_agent import enhance_agent_with_dynamic_capabilities, ContextDecisionEngine
 from rscrew.interactive_dialogue import conduct_operator_dialogue
 from rscrew.tenacity_llm_handler import apply_tenacity_error_handling_to_agents, check_tenacity_installation
 from rscrew.model_manager import create_llm_with_smart_routing, get_model_manager
@@ -982,32 +984,81 @@ class Rscrew():
         
         return result
 
+    def enhance_agents_with_dynamic_capabilities(self, agents: List[Agent]) -> List[Agent]:
+        """Enhance agents with dynamic advisory/implementation capabilities"""
+        debug_print("=== Enhancing Agents with Dynamic Capabilities ===")
+        
+        enhanced_agents = []
+        agent_name_mapping = {
+            'Project Orchestrator': 'project_orchestrator',
+            'Research Analyst': 'research_analyst', 
+            'Solution Architect': 'solution_architect',
+            'Code Implementer': 'code_implementer',
+            'Quality Assurance': 'quality_assurance',
+            'Technical Writer': 'technical_writer',
+            'Plan Update Coordinator': 'plan_update_coordinator'
+        }
+        
+        for agent in agents:
+            agent_role = getattr(agent, 'role', 'unknown')
+            agent_name = agent_name_mapping.get(agent_role, agent_role.lower().replace(' ', '_'))
+            
+            debug_print(f"Enhancing agent: {agent_role} -> {agent_name}")
+            
+            # Add implementation tools to agent
+            if hasattr(agent, 'tools'):
+                agent.tools.extend(IMPLEMENTATION_TOOLS)
+            else:
+                agent.tools = IMPLEMENTATION_TOOLS.copy()
+                
+            # Create dynamic wrapper (but keep original agent for CrewAI compatibility)
+            dynamic_agent = enhance_agent_with_dynamic_capabilities(agent, agent_name)
+            
+            # Store dynamic capabilities as agent attribute for later use
+            agent._dynamic_capabilities = dynamic_agent
+            
+            enhanced_agents.append(agent)
+            debug_print(f"✅ Enhanced {agent_role} with {len(IMPLEMENTATION_TOOLS)} implementation tools")
+            
+        debug_print(f"=== Enhanced {len(enhanced_agents)} agents with dynamic capabilities ===")
+        return enhanced_agents
+
     @crew
     def crew(self) -> Crew:
-        """Creates the Rscrew crew"""
-        debug_print("=== Creating Crew ===")
+        """Creates the Rscrew crew with dynamic advisory/implementation capabilities"""
+        debug_print("=== Creating Enhanced Dynamic Crew ===")
         debug_print(f"Available agents: {len(self.agents)}")
         debug_print(f"Available tasks: {len(self.tasks)}")
         
         for i, agent in enumerate(self.agents):
             debug_print(f"Agent {i}: {getattr(agent, 'role', 'unknown')} with LLM: {getattr(agent, 'llm', 'None')}")
         
-        # Apply Tenacity-based LLM error handling to all agents
-        debug_print("Applying Tenacity-based LLM error handling to agents...")
+        # Enhance agents with dynamic capabilities FIRST
+        debug_print("Enhancing agents with dynamic advisory/implementation capabilities...")
+        enhanced_agents = self.enhance_agents_with_dynamic_capabilities(self.agents)
+        
+        # Apply Tenacity-based LLM error handling to enhanced agents
+        debug_print("Applying Tenacity-based LLM error handling to enhanced agents...")
         tenacity_available = check_tenacity_installation()
         debug_print(f"Tenacity available: {tenacity_available}")
         
-        robust_agents = apply_tenacity_error_handling_to_agents(self.agents)
+        robust_agents = apply_tenacity_error_handling_to_agents(enhanced_agents)
         
         crew = Crew(
-            agents=robust_agents, # Agents with error handling applied
+            agents=robust_agents, # Enhanced agents with error handling applied
             tasks=self.tasks, # Automatically created by the @task decorator
             process=Process.sequential,
             verbose=True,
             # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
         
-        debug_print("Crew created successfully with Tenacity-based LLM error handling")
+        debug_print("✅ Dynamic Crew created successfully with:")
+        debug_print("  - Dynamic advisory/implementation capabilities")
+        debug_print("  - Implementation tools for all agents")
+        debug_print("  - Git-based rollback system")
+        debug_print("  - Safety controls and permission management")
+        debug_print("  - Learning system for user preferences")
+        debug_print("  - Tenacity-based LLM error handling")
         debug_print("====================")
         return crew
 

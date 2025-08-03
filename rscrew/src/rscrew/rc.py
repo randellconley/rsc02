@@ -43,10 +43,30 @@ def load_environment():
 load_environment()
 
 
+def detect_implementation_intent(user_request: str) -> Dict[str, Any]:
+    """
+    Detect if user request requires implementation vs advisory response.
+    Used by dynamic agents to determine mode switching.
+    """
+    from rscrew.dynamic_agent import ContextDecisionEngine
+    
+    decision_engine = ContextDecisionEngine()
+    analysis = decision_engine.analyze_request(user_request, {})
+    
+    return {
+        'requires_implementation': analysis['mode'] in ['IMPLEMENTATION', 'HYBRID'],
+        'implementation_confidence': analysis['confidence'],
+        'implementation_mode': analysis['mode'],
+        'risk_level': analysis['estimated_risk'],
+        'specific_target': analysis['specific_target'],
+        'requires_confirmation': analysis['requires_confirmation']
+    }
+
+
 def classify_request_intent(user_request: str, execution_context: str, force_classification: str = None) -> Dict[str, str]:
     """
     Classify user intent to determine appropriate workflow routing.
-    Updated with enhanced logic per prompt 15 requirements.
+    Enhanced with dynamic implementation detection for advisory/implementation mode switching.
     
     Args:
         user_request (str): The user's original request
@@ -54,7 +74,7 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
         force_classification (str): Optional forced classification ('info' or 'build')
         
     Returns:
-        Dict[str, str]: Intent classification with confidence and routing recommendation
+        Dict[str, str]: Intent classification with confidence, routing, and implementation flags
     """
     request_lower = user_request.lower().strip()
     
@@ -320,11 +340,21 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
         workflow = "Quick Response"
         reasoning = "No clear intent indicators found, defaulting to information request"
     
+    # Add implementation detection for dynamic agent mode switching
+    implementation_analysis = detect_implementation_intent(user_request)
+    
     return {
         "intent": intent,
         "confidence": confidence,
         "workflow": workflow,
-        "reasoning": reasoning
+        "reasoning": reasoning,
+        # Dynamic implementation detection
+        "requires_implementation": implementation_analysis['requires_implementation'],
+        "implementation_mode": implementation_analysis['implementation_mode'],
+        "implementation_confidence": implementation_analysis['implementation_confidence'],
+        "risk_level": implementation_analysis['risk_level'],
+        "specific_target": implementation_analysis['specific_target'],
+        "requires_confirmation": implementation_analysis['requires_confirmation']
     }
 
 
@@ -447,6 +477,22 @@ def run_crew_with_prompt(user_prompt):
         intent_result = classify_request_intent(user_prompt, execution_context)
         debug_print(f"Intent classification: {intent_result['intent']} (confidence: {intent_result['confidence']})")
         debug_print(f"Reasoning: {intent_result['reasoning']}")
+        
+        # Enhanced: Check for implementation requirements
+        debug_print(f"Implementation analysis:")
+        debug_print(f"  - Requires implementation: {intent_result.get('requires_implementation', False)}")
+        debug_print(f"  - Implementation mode: {intent_result.get('implementation_mode', 'ADVISORY')}")
+        debug_print(f"  - Risk level: {intent_result.get('risk_level', 'LOW')}")
+        debug_print(f"  - Specific target: {intent_result.get('specific_target', False)}")
+        
+        # Store implementation context for agents
+        inputs['implementation_context'] = {
+            'requires_implementation': intent_result.get('requires_implementation', False),
+            'implementation_mode': intent_result.get('implementation_mode', 'ADVISORY'),
+            'risk_level': intent_result.get('risk_level', 'LOW'),
+            'specific_target': intent_result.get('specific_target', False),
+            'requires_confirmation': intent_result.get('requires_confirmation', False)
+        }
         
         # Route to appropriate workflow based on intent
         if intent_result["intent"] == "INFORMATION":

@@ -122,7 +122,7 @@ rc -plan "Create a machine learning model for classification" -name ml_model
 ### DevOps
 rc -plan "Set up CI/CD pipeline with GitHub Actions" -name cicd
 rc -plan "Create Docker containerization for Node.js app" -name docker
-
+ 
 ### Debugging
 rc "Analyze why my React app won't start"
 rc "Help troubleshoot database connection issues"
