@@ -9,6 +9,28 @@ import yaml
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from crewai import LLM
+from dotenv import load_dotenv
+
+# Load environment variables from .env file at module import
+def load_environment():
+    """Load environment variables from .env files in multiple locations"""
+    env_paths = [
+        '.env',  # Current directory
+        'rscrew/.env',  # rscrew subdirectory  
+        os.path.join(os.path.dirname(__file__), '../../.env'),  # Relative to this file
+        os.path.expanduser('~/.rscrew/.env'),  # User home directory
+    ]
+    
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            if os.getenv('RSCREW_DEBUG', 'false').lower() == 'true':
+                print(f"[DEBUG] Model Manager loaded .env from: {env_path}")
+            return True
+    return False
+
+# Load environment variables immediately
+load_environment()
 
 # Global rate limiting variables
 _last_call_time = 0
@@ -37,7 +59,7 @@ class ModelManager:
     """Centralized model management system"""
     
     def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path or os.getenv('RSCREW_MODEL_CONFIG_PATH', 'src/rscrew/config/model_config.yaml')
+        self.config_path = self._find_config_file(config_path)
         self.config = self._load_config()
         self._validate_config()
         self._setup_rate_limiting()
@@ -47,6 +69,28 @@ class ModelManager:
         debug_print(f"Available providers: {list(self.config['providers'].keys())}")
         debug_print(f"Rate limiting: {self.config['global_settings']['rate_limiting']['enabled']}")
         debug_print("=================================")
+    
+    def _find_config_file(self, config_path: Optional[str] = None) -> str:
+        """Find the model configuration file in multiple locations"""
+        if config_path:
+            return config_path
+        
+        # Try multiple locations for the config file
+        possible_paths = [
+            os.getenv('RSCREW_MODEL_CONFIG_PATH', ''),
+            'src/rscrew/config/model_config.yaml',
+            'rscrew/src/rscrew/config/model_config.yaml',
+            os.path.join(os.path.dirname(__file__), 'config/model_config.yaml'),
+            os.path.join(os.path.dirname(__file__), '../config/model_config.yaml'),
+        ]
+        
+        for path in possible_paths:
+            if path and os.path.exists(path):
+                debug_print(f"Found config file at: {path}")
+                return path
+        
+        # Return default path if none found
+        return 'src/rscrew/config/model_config.yaml'
     
     def _load_config(self) -> Dict[str, Any]:
         """Load model configuration from YAML file"""

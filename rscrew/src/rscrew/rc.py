@@ -11,9 +11,36 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 from typing import Dict
+from dotenv import load_dotenv
 from rscrew.crew import Rscrew
 from rscrew.output_capture import capture_output
 from rscrew.plan_manager import PlanManager, InteractivePlanSession
+
+# Load environment variables from .env file
+def load_environment():
+    """Load environment variables from .env files in multiple locations"""
+    # Try multiple .env file locations
+    env_paths = [
+        '.env',  # Current directory
+        'rscrew/.env',  # rscrew subdirectory
+        os.path.join(os.path.dirname(__file__), '../../.env'),  # Relative to this file
+        os.path.expanduser('~/.rscrew/.env'),  # User home directory
+    ]
+    
+    loaded = False
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            if os.getenv('RSCREW_DEBUG', 'false').lower() == 'true':
+                print(f"[DEBUG] Loaded .env from: {env_path}")
+            loaded = True
+            break
+    
+    if not loaded and os.getenv('RSCREW_DEBUG', 'false').lower() == 'true':
+        print("[DEBUG] No .env file found in standard locations")
+
+# Load environment variables at module import
+load_environment()
 
 
 def classify_request_intent(user_request: str, execution_context: str, force_classification: str = None) -> Dict[str, str]:

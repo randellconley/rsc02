@@ -1,6 +1,7 @@
 import os
 import logging
 import time
+from dotenv import load_dotenv
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
@@ -16,6 +17,27 @@ from rscrew.tools.programming_tools import (
 from rscrew.interactive_dialogue import conduct_operator_dialogue
 from rscrew.tenacity_llm_handler import apply_tenacity_error_handling_to_agents, check_tenacity_installation
 from rscrew.model_manager import create_llm_with_smart_routing, get_model_manager
+
+# Load environment variables from .env file
+def load_environment():
+    """Load environment variables from .env files in multiple locations"""
+    env_paths = [
+        '.env',  # Current directory
+        'rscrew/.env',  # rscrew subdirectory  
+        os.path.join(os.path.dirname(__file__), '../../.env'),  # Relative to this file
+        os.path.expanduser('~/.rscrew/.env'),  # User home directory
+    ]
+    
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            if os.getenv('RSCREW_DEBUG', 'false').lower() == 'true':
+                print(f"[DEBUG] Loaded .env from: {env_path}")
+            return True
+    return False
+
+# Load environment variables at module import
+load_environment()
 
 # Version information for deployment tracking
 RSCREW_VERSION = "v3.1-tenacity-hybrid"
