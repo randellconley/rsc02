@@ -128,14 +128,43 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
                     all_questions = False
                     all_actions = False
         
-        # If there are ANY action items in the prompt → IMPLEMENTATION
+        # If there are ANY action items in the prompt → check confidence thresholds
         if action_count > 0:
-            return {
-                "intent": "IMPLEMENTATION",
-                "confidence": "High 0.85",
-                "workflow": "Full Development",
-                "reasoning": "Contains action statements - classified as implementation request"
-            }
+            # Calculate confidence based on action count and clarity
+            base_confidence = 0.65 if action_count == 1 else (0.8 if action_count == 2 else 0.9)
+            
+            # Reduce confidence for mixed content (questions + actions)
+            if question_count > 0 and action_count > 0:
+                # More significant reduction for mixed content
+                if question_count >= action_count * 2:  # Many more questions than actions
+                    action_confidence = base_confidence * 0.3  # Very low confidence
+                else:
+                    action_confidence = base_confidence * 0.7  # Moderate reduction
+            else:
+                action_confidence = base_confidence
+            
+            # Apply confidence thresholds per prompt 17 requirements
+            if action_confidence < 0.20:
+                return {
+                    "intent": "NONSENSE",
+                    "confidence": f"Low {action_confidence:.2f}",
+                    "workflow": "No Action",
+                    "reasoning": f"Action confidence {action_confidence:.2f} below 0.20 threshold, classified as nonsense"
+                }
+            elif action_confidence < 0.60:
+                return {
+                    "intent": "INFORMATION",
+                    "confidence": f"Medium {action_confidence:.2f}",
+                    "workflow": "Quick Response",
+                    "reasoning": f"Action confidence {action_confidence:.2f} below 0.60 threshold, defaulting to INFORMATION"
+                }
+            else:
+                return {
+                    "intent": "IMPLEMENTATION",
+                    "confidence": f"High {action_confidence:.2f}" if action_confidence >= 0.75 else f"Medium {action_confidence:.2f}",
+                    "workflow": "Full Development",
+                    "reasoning": "Contains action statements with sufficient confidence - classified as implementation request"
+                }
         
         # Only classify as INFORMATION if ALL parts are questions (and no actions)
         if all_questions and question_count > 0:
