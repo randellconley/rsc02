@@ -7,6 +7,7 @@ LLM error handling and context-aware fallbacks.
 
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional, Union
 from functools import wraps
 
@@ -28,6 +29,10 @@ logger = logging.getLogger(__name__)
 class TenacityLLMHandler:
     """Enhanced LLM error handler using Tenacity for robust retries"""
     
+    # Class variable to track last call time for rate limiting
+    _last_call_time = 0
+    _min_call_interval = float(os.getenv('RSCREW_LLM_MIN_INTERVAL', '0.5'))  # 500ms between calls
+    
     def __init__(self):
         self.debug_mode = os.getenv('RSCREW_DEBUG', 'true').lower() == 'true'
         self.max_retries = int(os.getenv('RSCREW_LLM_MAX_RETRIES', '3'))
@@ -39,6 +44,18 @@ class TenacityLLMHandler:
         """Print debug message if debug mode is enabled"""
         if self.debug_mode:
             logger.info(f"[TENACITY_LLM_HANDLER] {message}")
+    
+    def apply_rate_limiting(self):
+        """Apply rate limiting to prevent API overload"""
+        current_time = time.time()
+        time_since_last_call = current_time - TenacityLLMHandler._last_call_time
+        
+        if time_since_last_call < TenacityLLMHandler._min_call_interval:
+            sleep_time = TenacityLLMHandler._min_call_interval - time_since_last_call
+            self.debug_print(f"Rate limiting: sleeping for {sleep_time:.3f}s")
+            time.sleep(sleep_time)
+        
+        TenacityLLMHandler._last_call_time = time.time()
     
     def is_llm_error(self, exception: Exception) -> bool:
         """Check if exception is an LLM-related error worth retrying"""
@@ -67,14 +84,20 @@ class TenacityLLMHandler:
     def validate_llm_response(self, response: Any) -> bool:
         """Validate that LLM response is not None or empty"""
         if response is None:
+            self.debug_print("LLM response validation failed: response is None")
             return False
         
         if isinstance(response, str) and response.strip() == "":
+            self.debug_print(f"LLM response validation failed: empty string (length: {len(response)})")
             return False
         
         if hasattr(response, 'content') and (response.content is None or response.content.strip() == ""):
+            self.debug_print("LLM response validation failed: response.content is None or empty")
             return False
         
+        # Valid response
+        response_length = len(str(response))
+        self.debug_print(f"LLM response validation passed: length {response_length}")
         return True
     
     def get_fallback_response(self, context: str = "") -> str:
@@ -147,6 +170,9 @@ def with_tenacity_llm_error_handling(fallback_enabled: bool = True):
                 # Apply Tenacity retry logic
                 @tenacity_retry
                 def _retry_func():
+                    # Apply rate limiting before each call
+                    handler.apply_rate_limiting()
+                    
                     result = func(*args, **kwargs)
                     
                     # Validate the response

@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
@@ -23,25 +24,72 @@ RSCREW_COMMIT = "programming-assistant"  # Full programming assistant crew imple
 # Debug toggle - only enabled when explicitly set to 'true'
 DEBUG_MODE = os.getenv('RSCREW_DEBUG', 'false').lower() == 'true'
 
+# Rate limiting variables
+_last_call_time = 0.0
+_min_call_interval = float(os.getenv('RSCREW_LLM_MIN_INTERVAL', '0.5'))
+
 def debug_print(message):
     if DEBUG_MODE:
         print(f"[DEBUG] {message}")
 
-def create_llm_with_monitoring(agent_name: str):
-    """Create an LLM instance with monitoring and error handling for the specified agent"""
+def apply_rate_limiting():
+    """Apply rate limiting to prevent API overload"""
+    global _last_call_time
+    current_time = time.time()
+    time_since_last_call = current_time - _last_call_time
+    
+    if time_since_last_call < _min_call_interval:
+        sleep_time = _min_call_interval - time_since_last_call
+        if DEBUG_MODE:
+            debug_print(f"Rate limiting: sleeping for {sleep_time:.3f}s")
+        time.sleep(sleep_time)
+    
+    _last_call_time = time.time()
+
+def create_claude_llm_with_monitoring(agent_name: str):
+    """Create a Claude LLM instance with monitoring and error handling for the specified agent"""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     
     try:
         llm = LLM(model="claude-3-5-sonnet-20241022", api_key=api_key)
-        debug_print(f"LLM created for {agent_name}: {llm.model}")
+        debug_print(f"Claude LLM created for {agent_name}: {llm.model}")
         
+        # Apply rate limiting and error handling
+        return apply_llm_monitoring_and_rate_limiting(llm, agent_name, "Claude")
+        
+    except Exception as e:
+        debug_print(f"Error creating Claude LLM for {agent_name}: {e}")
+        raise
+
+def create_gemini_llm_with_monitoring(agent_name: str):
+    """Create a Gemini LLM instance with monitoring and error handling for the specified agent"""
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    try:
+        llm = LLM(model="gemini-1.5-pro", api_key=api_key)
+        debug_print(f"Gemini LLM created for {agent_name}: {llm.model}")
+        
+        # Apply rate limiting and error handling
+        return apply_llm_monitoring_and_rate_limiting(llm, agent_name, "Gemini")
+        
+    except Exception as e:
+        debug_print(f"Error creating Gemini LLM for {agent_name}: {e}")
+        # Fallback to Claude if Gemini fails
+        debug_print(f"Falling back to Claude for {agent_name}")
+        return create_claude_llm_with_monitoring(agent_name)
+
+def apply_llm_monitoring_and_rate_limiting(llm, agent_name: str, provider: str):
+    """Apply monitoring and rate limiting to an LLM instance"""
+    
+    try:
         # Fix LLM call method - ensure proper method binding and error handling
         if llm and hasattr(llm, 'call'):
             original_call = llm.call
             
             def fixed_call(*args, **kwargs):
                 if DEBUG_MODE:
-                    debug_print(f"=== CrewAI LLM Call Intercepted ({agent_name} - {RSCREW_VERSION}) ===")
+                    debug_print(f"=== {provider} LLM Call Intercepted ({agent_name} - {RSCREW_VERSION}) ===")
+                    debug_print(f"Provider: {provider}")
                     debug_print(f"Features Active: {', '.join(RSCREW_FEATURES)}")
                     debug_print(f"Args count: {len(args)}")
                     debug_print(f"Kwargs keys: {list(kwargs.keys()) if kwargs else 'None'}")
@@ -61,6 +109,9 @@ def create_llm_with_monitoring(agent_name: str):
                         if DEBUG_MODE:
                             debug_print(f"WARNING: Empty or None prompt detected ({agent_name})")
                         return ""
+                    
+                    # Apply rate limiting
+                    apply_rate_limiting()
                     
                     result = original_call(*args, **kwargs)
                     
@@ -141,7 +192,7 @@ class Rscrew():
     def operator_intent_interpreter(self) -> Agent:
         debug_print("=== Creating Operator Intent Interpreter Agent ===")
         
-        llm = create_llm_with_monitoring("operator_intent_interpreter")
+        llm = create_gemini_llm_with_monitoring("operator_intent_interpreter")
         
         agent = Agent(
             config=self.agents_config['operator_intent_interpreter'], # type: ignore[index]
@@ -162,7 +213,7 @@ class Rscrew():
     @agent
     def project_orchestrator(self) -> Agent:
         debug_print("=== Creating Project Orchestrator Agent ===")
-        llm = create_llm_with_monitoring("Project Orchestrator")
+        llm = create_claude_llm_with_monitoring("Project Orchestrator")
         
         agent = Agent(
             config=self.agents_config['project_orchestrator'], # type: ignore[index]
@@ -183,7 +234,7 @@ class Rscrew():
     @agent
     def research_analyst(self) -> Agent:
         debug_print("=== Creating Research Analyst Agent ===")
-        llm = create_llm_with_monitoring("Research Analyst")
+        llm = create_gemini_llm_with_monitoring("Research Analyst")
         
         agent = Agent(
             config=self.agents_config['research_analyst'], # type: ignore[index]
@@ -203,7 +254,7 @@ class Rscrew():
     @agent
     def solution_architect(self) -> Agent:
         debug_print("=== Creating Solution Architect Agent ===")
-        llm = create_llm_with_monitoring("Solution Architect")
+        llm = create_claude_llm_with_monitoring("Solution Architect")
         
         agent = Agent(
             config=self.agents_config['solution_architect'], # type: ignore[index]
@@ -223,7 +274,7 @@ class Rscrew():
     @agent
     def code_implementer(self) -> Agent:
         debug_print("=== Creating Code Implementer Agent ===")
-        llm = create_llm_with_monitoring("Code Implementer")
+        llm = create_claude_llm_with_monitoring("Code Implementer")
         
         agent = Agent(
             config=self.agents_config['code_implementer'], # type: ignore[index]
@@ -243,7 +294,7 @@ class Rscrew():
     @agent
     def quality_assurance(self) -> Agent:
         debug_print("=== Creating Quality Assurance Agent ===")
-        llm = create_llm_with_monitoring("Quality Assurance")
+        llm = create_claude_llm_with_monitoring("Quality Assurance")
         
         agent = Agent(
             config=self.agents_config['quality_assurance'], # type: ignore[index]
@@ -263,7 +314,7 @@ class Rscrew():
     @agent
     def technical_writer(self) -> Agent:
         debug_print("=== Creating Technical Writer Agent ===")
-        llm = create_llm_with_monitoring("Technical Writer")
+        llm = create_gemini_llm_with_monitoring("Technical Writer")
         
         agent = Agent(
             config=self.agents_config['technical_writer'], # type: ignore[index]
@@ -284,7 +335,7 @@ class Rscrew():
     @agent
     def security_architecture_specialist(self) -> Agent:
         debug_print("=== Creating Security Architecture Specialist Agent ===")
-        llm = create_llm_with_monitoring("Security Architecture Specialist")
+        llm = create_gemini_llm_with_monitoring("Security Architecture Specialist")
         
         agent = Agent(
             config=self.agents_config['security_architecture_specialist'], # type: ignore[index]
@@ -304,7 +355,7 @@ class Rscrew():
     @agent
     def database_architecture_specialist(self) -> Agent:
         debug_print("=== Creating Database Architecture Specialist Agent ===")
-        llm = create_llm_with_monitoring("Database Architecture Specialist")
+        llm = create_gemini_llm_with_monitoring("Database Architecture Specialist")
         
         agent = Agent(
             config=self.agents_config['database_architecture_specialist'], # type: ignore[index]
@@ -324,7 +375,7 @@ class Rscrew():
     @agent
     def frontend_architecture_specialist(self) -> Agent:
         debug_print("=== Creating Frontend Architecture Specialist Agent ===")
-        llm = create_llm_with_monitoring("Frontend Architecture Specialist")
+        llm = create_gemini_llm_with_monitoring("Frontend Architecture Specialist")
         
         agent = Agent(
             config=self.agents_config['frontend_architecture_specialist'], # type: ignore[index]
@@ -344,7 +395,7 @@ class Rscrew():
     @agent
     def infrastructure_specialist(self) -> Agent:
         debug_print("=== Creating Infrastructure Specialist Agent ===")
-        llm = create_llm_with_monitoring("Infrastructure Specialist")
+        llm = create_gemini_llm_with_monitoring("Infrastructure Specialist")
         
         agent = Agent(
             config=self.agents_config['infrastructure_specialist'], # type: ignore[index]
@@ -364,7 +415,7 @@ class Rscrew():
     @agent
     def feature_analyst(self) -> Agent:
         debug_print("=== Creating Feature Analyst Agent ===")
-        llm = create_llm_with_monitoring("Feature Analyst")
+        llm = create_gemini_llm_with_monitoring("Feature Analyst")
         
         agent = Agent(
             config=self.agents_config['feature_analyst'], # type: ignore[index]
@@ -384,7 +435,7 @@ class Rscrew():
     @agent
     def plan_update_coordinator(self) -> Agent:
         debug_print("=== Creating Plan Update Coordinator Agent ===")
-        llm = create_llm_with_monitoring("Plan Update Coordinator")
+        llm = create_claude_llm_with_monitoring("Plan Update Coordinator")
         
         agent = Agent(
             config=self.agents_config['plan_update_coordinator'], # type: ignore[index]
