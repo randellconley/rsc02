@@ -934,6 +934,53 @@ def run_test_command(test_type=None, details=False, clean=False, verbose=False, 
         print("⚠️  Some tests failed")
         print("Use 'rc -test <name> --details' for expanded output")
 
+def run_classification(prompt_text, file_path):
+    """
+    Classify prompt intent and show workflow routing without execution.
+    """
+    try:
+        # Get prompt text
+        if file_path:
+            if not os.path.exists(file_path):
+                print(f"❌ Error: File not found: {file_path}")
+                return
+            with open(file_path, 'r', encoding='utf-8') as f:
+                prompt_text = f.read().strip()
+        
+        if not prompt_text:
+            print("❌ Error: No prompt text provided")
+            return
+        
+        # Classify the request
+        execution_context = f"Classification mode in {os.getcwd()}"
+        classification = classify_request_intent(prompt_text, execution_context)
+        
+        intent = classification["intent"]
+        confidence = classification["confidence"]
+        reasoning = classification["reasoning"]
+        
+        # Determine workflow
+        if intent == "INFORMATION":
+            workflow = "Information Workflow (Fast)"
+            description = "Single research analyst, direct response, no interactive dialogue"
+        else:
+            workflow = "Interactive Dialogue Workflow (Full)"
+            description = "Full crew with operator dialogue and complex task handling"
+        
+        # Display results
+        print("🔍 Intent Classification Results")
+        print("=" * 40)
+        print(f"Prompt: {prompt_text[:100]}{'...' if len(prompt_text) > 100 else ''}")
+        print(f"Intent: {intent}")
+        print(f"Confidence: {confidence}")
+        print(f"Reasoning: {reasoning}")
+        print(f"Workflow: {workflow}")
+        print(f"Description: {description}")
+        print("=" * 40)
+        
+    except Exception as e:
+        print(f"❌ Error during classification: {str(e)}")
+
 def run():
     """
     Main entry point for the RC command.
@@ -955,6 +1002,10 @@ Testing Commands:
   rc -test all                                Run all tests in parallel
   rc -test --clean                            Clean up test generated files
   rc -check                                   System health check
+
+Classification System:
+  rc -class "What is 2 + 2?"                 Classify prompt intent and show workflow routing
+  rc -class -f /path/to/prompt.txt            Classify prompt from file
 
 Planning System:
   rc -plan "Build a web app" [-name my_app]   Generate implementation plan
@@ -1037,6 +1088,13 @@ Examples:
         help='System health check'
     )
     
+    parser.add_argument(
+        '-class',
+        nargs='?',
+        const='',
+        help='Classify prompt intent and show workflow routing (no execution)'
+    )
+    
     # Primary mode arguments
     parser.add_argument(
         '-f', '--file',
@@ -1058,6 +1116,9 @@ Examples:
                         verbose=args.verbose, debug=args.debug)
     elif args.check:
         run_quick_check()
+    # Classification system
+    elif getattr(args, 'class') is not None:
+        run_classification(getattr(args, 'class'), args.file)
     # Planning system
     elif args.plan:
         run_plan_generation(args.plan, args.name)
