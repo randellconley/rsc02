@@ -19,11 +19,12 @@ def run():
     """
     inputs = {
         'topic': 'AI LLMs',
-        'current_year': str(datetime.now().year)
+        'current_year': str(datetime.now().year),
+        'execution_context': 'Command line execution via crewai run'
     }
     
     try:
-        Rscrew().crew().kickoff(inputs=inputs)
+        Rscrew().run_with_interactive_dialogue(inputs)
     except Exception as e:
         raise Exception(f"An error occurred while running the crew: {e}")
 
@@ -34,9 +35,11 @@ def train():
     """
     inputs = {
         "topic": "AI LLMs",
-        'current_year': str(datetime.now().year)
+        'current_year': str(datetime.now().year),
+        'execution_context': 'Training mode execution'
     }
     try:
+        # Note: Training mode uses direct crew kickoff to avoid interactive dialogue
         Rscrew().crew().train(n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs)
 
     except Exception as e:
@@ -58,10 +61,12 @@ def test():
     """
     inputs = {
         "topic": "AI LLMs",
-        "current_year": str(datetime.now().year)
+        "current_year": str(datetime.now().year),
+        'execution_context': 'Test mode execution'
     }
     
     try:
+        # Note: Test mode uses direct crew kickoff to avoid interactive dialogue
         Rscrew().crew().test(n_iterations=int(sys.argv[1]), eval_llm=sys.argv[2], inputs=inputs)
 
     except Exception as e:
