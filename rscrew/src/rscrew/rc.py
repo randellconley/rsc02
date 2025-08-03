@@ -10,7 +10,7 @@ import os
 import argparse
 from pathlib import Path
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Any
 from dotenv import load_dotenv
 from rscrew.crew import Rscrew
 from rscrew.output_capture import capture_output
