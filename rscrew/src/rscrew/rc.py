@@ -16,26 +16,81 @@ from rscrew.output_capture import capture_output
 from rscrew.plan_manager import PlanManager, InteractivePlanSession
 
 
-def classify_request_intent(user_request: str, execution_context: str) -> Dict[str, str]:
+def classify_request_intent(user_request: str, execution_context: str, force_classification: str = None) -> Dict[str, str]:
     """
     Classify user intent to determine appropriate workflow routing.
-    Extracted from ProjectManagementTools.classify_user_intent for standalone use.
+    Updated with enhanced logic per prompt 15 requirements.
     
     Args:
         user_request (str): The user's original request
         execution_context (str): Context about where the command was executed
+        force_classification (str): Optional forced classification ('info' or 'build')
         
     Returns:
         Dict[str, str]: Intent classification with confidence and routing recommendation
     """
-    request_lower = user_request.lower()
+    request_lower = user_request.lower().strip()
     
-    # Information request indicators
+    # Handle forced classification first
+    if force_classification:
+        if force_classification.lower() == 'info':
+            return {
+                "intent": "INFORMATION",
+                "confidence": "Forced 1.00",
+                "workflow": "Quick Response",
+                "reasoning": "Classification forced to INFORMATION via -setClass flag"
+            }
+        elif force_classification.lower() == 'build':
+            return {
+                "intent": "IMPLEMENTATION", 
+                "confidence": "Forced 1.00",
+                "workflow": "Full Development",
+                "reasoning": "Classification forced to IMPLEMENTATION via -setClass flag"
+            }
+    
+    # Check for nonsense input (empty, random characters, no meaningful content)
+    if not request_lower or len(request_lower.strip()) < 3:
+        return {
+            "intent": "NONSENSE",
+            "confidence": "High 0.95",
+            "workflow": "No Action",
+            "reasoning": "Input too short or empty"
+        }
+    
+    # Check for random characters/numbers (nonsense detection)
+    import re
+    # If mostly non-alphabetic characters or random patterns
+    alpha_ratio = len(re.findall(r'[a-zA-Z]', request_lower)) / len(request_lower)
+    if alpha_ratio < 0.3:  # Less than 30% alphabetic characters
+        return {
+            "intent": "NONSENSE",
+            "confidence": "High 0.90",
+            "workflow": "No Action", 
+            "reasoning": "Input appears to be random characters or numbers"
+        }
+    
+    # EMPHASIZE: If prompt is all questions, classify as INFORMATION
+    question_words = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can you', 'could you', 'would you', 'do you', 'is there', 'are there']
+    question_marks = request_lower.count('?')
+    question_word_matches = sum(1 for word in question_words if word in request_lower)
+    
+    # Strong question indicators
+    if question_marks > 0 or question_word_matches >= 2:
+        return {
+            "intent": "INFORMATION",
+            "confidence": "High 0.85",
+            "workflow": "Quick Response",
+            "reasoning": "Request contains questions - classified as information request"
+        }
+    
+    # Information request indicators (including analysis, reports, general info gathering)
     info_keywords = [
         'what is', 'how does', 'explain', 'what are the differences', 'compare',
         'why should i', 'pros and cons', 'advantages', 'disadvantages', 'benefits',
         'what are', 'how do', 'tell me about', 'describe', 'definition of',
-        'analyze', 'summary', 'summarize', 'overview', 'review', 'examine'
+        'analyze', 'analysis', 'summary', 'summarize', 'overview', 'review', 'examine',
+        'generate report', 'create report', 'report on', 'information about',
+        'research', 'investigate', 'study', 'explore', 'understand'
     ]
     
     # Planning request indicators  
@@ -45,11 +100,12 @@ def classify_request_intent(user_request: str, execution_context: str) -> Dict[s
         'how to structure', 'what framework', 'which tool', 'advice for'
     ]
     
-    # Implementation request indicators
+    # Implementation request indicators (ONLY for actual building/coding actions)
+    # EXCLUDE report generation, analysis, and information gathering
     implementation_keywords = [
-        'build me', 'create a', 'implement', 'develop', 'write code',
-        'generate', 'make a', 'build a', 'create an', 'develop a',
-        'write a', 'code for', 'program that', 'application that'
+        'build me', 'create a program', 'write code for', 'develop an application',
+        'code a', 'program a', 'build an app', 'create software', 'develop software',
+        'write a script', 'build a system', 'create a tool', 'develop a tool'
     ]
     
     # Count matches
@@ -63,7 +119,7 @@ def classify_request_intent(user_request: str, execution_context: str) -> Dict[s
     
     # Base confidence calculation
     if max_matches == 0:
-        confidence_score = 0.3  # Low confidence for unclear requests
+        confidence_score = 0.15  # Very low confidence for unclear requests
     elif max_matches == 1:
         confidence_score = 0.65  # Medium confidence for single match
     elif max_matches == 2:
@@ -75,7 +131,19 @@ def classify_request_intent(user_request: str, execution_context: str) -> Dict[s
     if total_matches > max_matches:  # Mixed signals reduce confidence
         confidence_score *= 0.85
     
-    # Determine intent
+    # Check for nonsense classification threshold
+    info_confidence = confidence_score if info_matches == max_matches else confidence_score * 0.5
+    build_confidence = confidence_score if implementation_matches == max_matches else confidence_score * 0.5
+    
+    if info_confidence < 0.2 and build_confidence < 0.2:
+        return {
+            "intent": "NONSENSE",
+            "confidence": f"Low {max(info_confidence, build_confidence):.2f}",
+            "workflow": "No Action",
+            "reasoning": "Both info and build confidence below 0.2 threshold"
+        }
+    
+    # Determine intent with updated logic
     if info_matches > planning_matches and info_matches > implementation_matches:
         intent = "INFORMATION"
         confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
@@ -87,10 +155,17 @@ def classify_request_intent(user_request: str, execution_context: str) -> Dict[s
         workflow = "Strategic Planning"
         reasoning = f"Request contains {planning_matches} planning/strategy keywords"
     elif implementation_matches > 0:
-        intent = "IMPLEMENTATION"
-        confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
-        workflow = "Full Development"
-        reasoning = f"Request contains {implementation_matches} implementation keywords"
+        # Apply 0.7 threshold rule for implementation
+        if confidence_score < 0.7:
+            intent = "INFORMATION"
+            confidence = f"Medium {confidence_score:.2f}"
+            workflow = "Quick Response"
+            reasoning = f"Implementation confidence {confidence_score:.2f} below 0.7 threshold, defaulting to INFORMATION"
+        else:
+            intent = "IMPLEMENTATION"
+            confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
+            workflow = "Full Development"
+            reasoning = f"Request contains {implementation_matches} implementation keywords with sufficient confidence"
     else:
         # Default to information for unclear requests
         intent = "INFORMATION"
@@ -952,9 +1027,10 @@ def run_test_command(test_type=None, details=False, clean=False, verbose=False, 
         print("⚠️  Some tests failed")
         print("Use 'rc -test <name> --details' for expanded output")
 
-def run_classification(prompt_text, file_path):
+def run_classification(prompt_text, file_path, set_class=None):
     """
     Classify prompt intent and show workflow routing without execution.
+    Updated to support -setClass flag per prompt 15 requirements.
     """
     try:
         # Get prompt text
@@ -969,9 +1045,9 @@ def run_classification(prompt_text, file_path):
             print("❌ Error: No prompt text provided")
             return
         
-        # Classify the request
+        # Classify the request with optional forced classification
         execution_context = f"Classification mode in {os.getcwd()}"
-        classification = classify_request_intent(prompt_text, execution_context)
+        classification = classify_request_intent(prompt_text, execution_context, set_class)
         
         intent = classification["intent"]
         confidence = classification["confidence"]
@@ -981,6 +1057,15 @@ def run_classification(prompt_text, file_path):
         if intent == "INFORMATION":
             workflow = "Information Workflow (Fast)"
             description = "Single research analyst, direct response, no interactive dialogue"
+        elif intent == "PLANNING":
+            workflow = "Strategic Planning Workflow"
+            description = "Planning crew for strategic advice and recommendations"
+        elif intent == "IMPLEMENTATION":
+            workflow = "Interactive Dialogue Workflow (Full)"
+            description = "Full crew with operator dialogue and complex task handling"
+        elif intent == "NONSENSE":
+            workflow = "No Action"
+            description = "Input appears to be nonsense or invalid - no workflow executed"
         else:
             workflow = "Interactive Dialogue Workflow (Full)"
             description = "Full crew with operator dialogue and complex task handling"
@@ -994,6 +1079,8 @@ def run_classification(prompt_text, file_path):
         print(f"Reasoning: {reasoning}")
         print(f"Workflow: {workflow}")
         print(f"Description: {description}")
+        if set_class:
+            print(f"Override: Classification forced via -setClass {set_class}")
         print("=" * 40)
         
     except Exception as e:
@@ -1024,6 +1111,8 @@ Testing Commands:
 Classification System:
   rc -class "What is 2 + 2?"                 Classify prompt intent and show workflow routing
   rc -class -f /path/to/prompt.txt            Classify prompt from file
+  rc -class "Build me an app" -setClass info  Force classification to info (override)
+  rc -class "What is Python?" -setClass build Force classification to build (override)
 
 Planning System:
   rc -plan "Build a web app" [-name my_app]   Generate implementation plan
@@ -1113,6 +1202,12 @@ Examples:
         help='Classify prompt intent and show workflow routing (no execution)'
     )
     
+    parser.add_argument(
+        '-setClass',
+        choices=['info', 'build'],
+        help='Force classification to specific type (info or build) - use with -class'
+    )
+    
     # Primary mode arguments
     parser.add_argument(
         '-f', '--file',
@@ -1136,7 +1231,7 @@ Examples:
         run_quick_check()
     # Classification system
     elif getattr(args, 'class') is not None:
-        run_classification(getattr(args, 'class'), args.file)
+        run_classification(getattr(args, 'class'), args.file, args.setClass)
     # Planning system
     elif args.plan:
         run_plan_generation(args.plan, args.name)
