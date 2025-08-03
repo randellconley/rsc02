@@ -618,6 +618,58 @@ class Rscrew():
         crew_instance = self.crew()
         return crew_instance.kickoff(inputs=enhanced_inputs)
 
+    def run_information_workflow(self, inputs: Dict[str, Any]) -> str:
+        """
+        Run a simplified workflow for information requests without interactive dialogue.
+        Designed for quick, direct responses to simple questions.
+        
+        Args:
+            inputs: Standard crew inputs including 'topic' and 'execution_context'
+            
+        Returns:
+            Direct response from research analyst
+        """
+        debug_print("=== Starting Simple Information Workflow ===")
+        
+        # Create a minimal crew with just the research analyst for quick responses
+        research_agent = self.research_analyst()
+        
+        # Apply error handling
+        robust_agents = apply_tenacity_error_handling_to_agents([research_agent])
+        
+        # Create a simple information task
+        from crewai import Task
+        
+        info_task = Task(
+            description=f"""
+            Provide a clear, direct answer to this question: {inputs.get('topic', '')}
+            
+            Context: {inputs.get('execution_context', '')}
+            
+            Requirements:
+            - Give a concise, accurate answer
+            - No need for extensive research or planning
+            - Focus on being helpful and informative
+            - Keep response under 200 words unless more detail is specifically needed
+            """,
+            expected_output="A clear, direct answer to the user's question",
+            agent=robust_agents[0]
+        )
+        
+        # Create minimal crew for information requests
+        info_crew = Crew(
+            agents=robust_agents,
+            tasks=[info_task],
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        debug_print("Information workflow crew created, executing...")
+        result = info_crew.kickoff(inputs=inputs)
+        debug_print("=== Information Workflow Complete ===")
+        
+        return result
+
     @crew
     def crew(self) -> Crew:
         """Creates the Rscrew crew"""

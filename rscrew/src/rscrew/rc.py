@@ -10,9 +10,84 @@ import os
 import argparse
 from pathlib import Path
 from datetime import datetime
+from typing import Dict
 from rscrew.crew import Rscrew
 from rscrew.output_capture import capture_output
 from rscrew.plan_manager import PlanManager, InteractivePlanSession
+
+
+def classify_request_intent(user_request: str, execution_context: str) -> Dict[str, str]:
+    """
+    Classify user intent to determine appropriate workflow routing.
+    Extracted from ProjectManagementTools.classify_user_intent for standalone use.
+    
+    Args:
+        user_request (str): The user's original request
+        execution_context (str): Context about where the command was executed
+        
+    Returns:
+        Dict[str, str]: Intent classification with confidence and routing recommendation
+    """
+    request_lower = user_request.lower()
+    
+    # Information request indicators
+    info_keywords = [
+        'what is', 'how does', 'explain', 'what are the differences', 'compare',
+        'why should i', 'pros and cons', 'advantages', 'disadvantages', 'benefits',
+        'what are', 'how do', 'tell me about', 'describe', 'definition of',
+        'analyze', 'summary', 'summarize', 'overview', 'review', 'examine'
+    ]
+    
+    # Planning request indicators  
+    planning_keywords = [
+        'what\'s the best approach', 'how should i', 'what would you recommend',
+        'what technologies should', 'help me plan', 'what strategy', 'best practices',
+        'how to structure', 'what framework', 'which tool', 'advice for'
+    ]
+    
+    # Implementation request indicators
+    implementation_keywords = [
+        'build me', 'create a', 'implement', 'develop', 'write code',
+        'generate', 'make a', 'build a', 'create an', 'develop a',
+        'write a', 'code for', 'program that', 'application that'
+    ]
+    
+    # Count matches
+    info_matches = sum(1 for keyword in info_keywords if keyword in request_lower)
+    planning_matches = sum(1 for keyword in planning_keywords if keyword in request_lower)
+    implementation_matches = sum(1 for keyword in implementation_keywords if keyword in request_lower)
+    
+    # Determine intent
+    if info_matches > planning_matches and info_matches > implementation_matches:
+        intent = "INFORMATION"
+        confidence = "High" if info_matches >= 2 else "Medium"
+        workflow = "Quick Response"
+        reasoning = f"Request contains {info_matches} information-seeking keywords"
+    elif planning_matches > implementation_matches:
+        intent = "PLANNING"
+        confidence = "High" if planning_matches >= 2 else "Medium"
+        workflow = "Strategic Planning"
+        reasoning = f"Request contains {planning_matches} planning/strategy keywords"
+    elif implementation_matches > 0:
+        intent = "IMPLEMENTATION"
+        confidence = "High" if implementation_matches >= 2 else "Medium"
+        workflow = "Full Development"
+        reasoning = f"Request contains {implementation_matches} implementation keywords"
+    else:
+        # Default to information for unclear requests
+        intent = "INFORMATION"
+        confidence = "Low"
+        workflow = "Quick Response"
+        reasoning = "No clear intent indicators found, defaulting to information request"
+    
+    return {
+        "intent": intent,
+        "confidence": confidence,
+        "workflow": workflow,
+        "reasoning": reasoning
+    }
+
+
 import subprocess
 import tempfile
 import shutil
@@ -127,9 +202,27 @@ def run_crew_with_prompt(user_prompt):
         crew_instance = Rscrew()
         debug_print("Rscrew instance created")
         
-        debug_print("Starting interactive dialogue workflow...")
-        result = crew_instance.run_with_interactive_dialogue(inputs)
-        debug_print("Interactive workflow completed")
+        # Classify intent to determine appropriate workflow
+        debug_print("Classifying user intent...")
+        intent_result = classify_request_intent(user_prompt, execution_context)
+        debug_print(f"Intent classification: {intent_result['intent']} (confidence: {intent_result['confidence']})")
+        debug_print(f"Reasoning: {intent_result['reasoning']}")
+        
+        # Route to appropriate workflow based on intent
+        if intent_result["intent"] == "INFORMATION":
+            debug_print("Routing to simple information workflow...")
+            # Check if simple information workflow exists, otherwise fallback
+            if hasattr(crew_instance, 'run_information_workflow'):
+                result = crew_instance.run_information_workflow(inputs)
+                debug_print("Information workflow completed")
+            else:
+                debug_print("Information workflow not implemented, falling back to interactive dialogue...")
+                result = crew_instance.run_with_interactive_dialogue(inputs)
+                debug_print("Interactive workflow completed")
+        else:
+            debug_print("Routing to full interactive dialogue workflow...")
+            result = crew_instance.run_with_interactive_dialogue(inputs)
+            debug_print("Interactive workflow completed")
         
         # Restore original stdout
         sys.stdout = output_logger.original_stdout
@@ -648,6 +741,8 @@ def run_single_test(test_name, timeout=600, verbose=False, debug=False):
         
         # Prepare test command based on test type
         if test_name == "basic":
+            # Basic test should run in project directory, not empty temp directory
+            os.chdir(original_cwd)  # Go back to project directory
             prompt = (assets_dir / "basic_prompt.txt").read_text().strip()
             cmd = ["rc", prompt]
         
