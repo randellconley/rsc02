@@ -69,19 +69,35 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
             "reasoning": "Input appears to be random characters or numbers"
         }
     
-    # EMPHASIZE: If prompt is all questions, classify as INFORMATION
-    question_words = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can you', 'could you', 'would you', 'do you', 'is there', 'are there']
-    question_marks = request_lower.count('?')
-    question_word_matches = sum(1 for word in question_words if word in request_lower)
+    # EMPHASIZE: If prompt is ALL questions, classify as INFORMATION
+    # Split into sentences and check if ALL are questions
+    import re
+    sentences = re.split(r'[.!?]+', request_lower)
+    sentences = [s.strip() for s in sentences if s.strip()]
     
-    # Strong question indicators
-    if question_marks > 0 or question_word_matches >= 2:
-        return {
-            "intent": "INFORMATION",
-            "confidence": "High 0.85",
-            "workflow": "Quick Response",
-            "reasoning": "Request contains questions - classified as information request"
-        }
+    if sentences:
+        question_words = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can you', 'could you', 'would you', 'do you', 'is there', 'are there']
+        
+        all_questions = True
+        for sentence in sentences:
+            # Check if sentence is a question (starts with question word or ends with ?)
+            is_question = (
+                any(sentence.startswith(qw) for qw in question_words) or
+                sentence.endswith('?') or
+                any(qw in sentence for qw in ['what', 'how', 'why', 'when', 'where', 'who', 'which'])
+            )
+            if not is_question:
+                all_questions = False
+                break
+        
+        # Only classify as INFORMATION if ALL sentences are questions
+        if all_questions and len(sentences) > 0:
+            return {
+                "intent": "INFORMATION",
+                "confidence": "High 0.85",
+                "workflow": "Quick Response",
+                "reasoning": "All sentences are questions - classified as information request"
+            }
     
     # Information request indicators (including analysis, reports, general info gathering)
     info_keywords = [
@@ -103,9 +119,11 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
     # Implementation request indicators (ONLY for actual building/coding actions)
     # EXCLUDE report generation, analysis, and information gathering
     implementation_keywords = [
-        'build me', 'create a program', 'write code for', 'develop an application',
-        'code a', 'program a', 'build an app', 'create software', 'develop software',
-        'write a script', 'build a system', 'create a tool', 'develop a tool'
+        'build', 'create', 'develop', 'implement', 'code', 'write', 'program',
+        'make', 'construct', 'design and build', 'build me', 'create a program', 
+        'write code for', 'develop an application', 'code a', 'program a', 
+        'build an app', 'create software', 'develop software', 'write a script', 
+        'build a system', 'create a tool', 'develop a tool'
     ]
     
     # Count matches
@@ -131,22 +149,26 @@ def classify_request_intent(user_request: str, execution_context: str, force_cla
     if total_matches > max_matches:  # Mixed signals reduce confidence
         confidence_score *= 0.85
     
-    # Check for nonsense classification threshold
+    # Check for nonsense classification threshold (updated to 0.10 per user request)
     info_confidence = confidence_score if info_matches == max_matches else confidence_score * 0.5
     build_confidence = confidence_score if implementation_matches == max_matches else confidence_score * 0.5
     
-    if info_confidence < 0.2 and build_confidence < 0.2:
+    if info_confidence < 0.10 and build_confidence < 0.10:
         return {
             "intent": "NONSENSE",
             "confidence": f"Low {max(info_confidence, build_confidence):.2f}",
             "workflow": "No Action",
-            "reasoning": "Both info and build confidence below 0.2 threshold"
+            "reasoning": "Both info and build confidence below 0.10 threshold"
         }
     
-    # Determine intent with updated logic
+    # Determine intent with updated logic (information confidence limit 0.60, nonsense 0.10)
     if info_matches > planning_matches and info_matches > implementation_matches:
         intent = "INFORMATION"
-        confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
+        # Apply 0.60 confidence limit for information requests
+        if confidence_score >= 0.60:
+            confidence = f"High {confidence_score:.2f}" if confidence_score >= 0.75 else f"Medium {confidence_score:.2f}"
+        else:
+            confidence = f"Low {confidence_score:.2f}"
         workflow = "Quick Response"
         reasoning = f"Request contains {info_matches} information-seeking keywords"
     elif planning_matches > implementation_matches:
