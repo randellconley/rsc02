@@ -15,10 +15,51 @@ from rscrew.crew import Rscrew
 class PlanManager:
     """Manages implementation plan files and operations"""
     
-    def __init__(self, plans_dir: str = "./plans"):
+    def __init__(self, plans_dir: str = None):
+        if plans_dir is None:
+            # Find project root and use plans directory there
+            plans_dir = self._find_project_plans_dir()
         self.plans_dir = Path(plans_dir)
         self.plans_dir.mkdir(exist_ok=True)
         self.crew_instance = None
+    
+    def _find_project_plans_dir(self) -> str:
+        """Find the project root and return the plans directory path"""
+        # Start from the module's location to find the project root
+        module_dir = Path(__file__).parent  # This is src/rscrew/
+        
+        # Go up to find the rscrew root directory
+        rscrew_root = module_dir.parent.parent  # This should be the rscrew/ directory
+        
+        # Verify this is the correct rscrew directory
+        if (rscrew_root / "src" / "rscrew").exists():
+            plans_dir = rscrew_root / "plans"
+            if os.getenv('RSCREW_DEBUG', 'false').lower() == 'true':
+                print(f"[DEBUG] Found rscrew root at: {rscrew_root}")
+                print(f"[DEBUG] Plans directory will be: {plans_dir}")
+            return str(plans_dir)
+        
+        # Fallback: look for project structure from current working directory
+        current_dir = Path.cwd()
+        
+        # Check if we're already in a project with rscrew structure
+        if (current_dir / "rscrew" / "src").exists():
+            return str(current_dir / "rscrew" / "plans")
+        
+        # Check if we're inside the rscrew directory
+        if current_dir.name == "rscrew" and (current_dir / "src").exists():
+            return str(current_dir / "plans")
+        
+        # Check if we're deeper in the rscrew structure
+        for parent in current_dir.parents:
+            if parent.name == "rscrew" and (parent / "src").exists():
+                return str(parent / "plans")
+            # Check if parent has rscrew subdirectory
+            if (parent / "rscrew" / "src").exists():
+                return str(parent / "rscrew" / "plans")
+        
+        # Fallback to current directory if no project structure found
+        return "./plans"
     
     def get_crew_instance(self) -> Rscrew:
         """Get or create crew instance"""
